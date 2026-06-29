@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
+import { parseVariableName } from '../utils/variableSyntax';
 
 /**
  * 从 content 文本扫描所有 {{key: val}} 内联值，返回更新后的 localOptions。
@@ -47,16 +48,7 @@ export const computeLocalOptionsFromContent = (contentStr, currentLocalOptions, 
  * @param {string} varName - 变量名
  * @returns {Object} { baseKey, groupId }
  */
-export const parseVariableName = (varName) => {
-  const match = varName.match(/^(.+?)(?:_(\d+))?$/);
-  if (match) {
-    return {
-      baseKey: match[1],
-      groupId: match[2] || null
-    };
-  }
-  return { baseKey: varName, groupId: null };
-};
+export { parseVariableName };
 
 /**
  * 联动组管理 Hook

@@ -92,7 +92,7 @@ Prompt Fill has officially reached **v1.1.3**. The original intention of this pr
 ## 🚀 Quick Start
 
 ### Prerequisites
-Node.js v18+ is recommended.
+Node.js v18+ is recommended. The app runs entirely in the browser during local development; no backend is required unless you configure the optional private share server.
 
 ### Private Share Server (Optional)
 This project supports short-link sharing via a private backend.
@@ -153,6 +153,13 @@ To recover folder-mode data, first try `prompt_fill_data.json`. If it is missing
     npm run build
     ```
 
+5.  **Check before changes are shared**
+    ```bash
+    npm run check
+    ```
+
+`npm run check` runs the Vitest unit suite and then builds the app. `npm run test:watch` keeps the unit tests open while editing.
+
 ### Shortcut Scripts
 *   **macOS**: `start.command`
 *   **Windows**: `start.bat`
@@ -172,6 +179,52 @@ Convert a user-created template into an official (built-in) template:
 4.  After batch importing, manually update `SYSTEM_DATA_VERSION` in `templates.js`.
 
 > **Tip**: In local dev mode (`localhost`), the Share modal has a "Copy Full Data" button that copies the raw JSON to clipboard — you can also pipe that into the import script interactively via `npm run import`.
+
+### Project Map
+
+- `src/App.jsx` — main app shell, storage orchestration, settings, import/export, and routing-level state.
+- `src/components/` — editor, preview, banks, modals, and reusable UI components.
+- `src/utils/` — pure helpers for storage validation, export sanitizing, merge behavior, variable syntax, and AI response parsing.
+- `src/data/` — built-in templates, banks, categories, defaults, and version metadata.
+- `src/hooks/` — focused React hooks for shared app behavior.
+- `scripts/` — local maintenance scripts such as data sync and template import.
+
+### Troubleshooting
+
+- **Install fails because npm cannot write its cache**: run with a project-local cache, for example `npm_config_cache=.npm-cache npm install` on macOS/Linux or `$env:npm_config_cache = "$PWD\.npm-cache"; npm install` in PowerShell.
+- **Folder storage is unavailable**: use a recent Chromium-based browser and serve the app from `localhost`; unsupported browsers fall back to browser storage.
+- **Folder mode opens an empty or damaged file**: try `prompt_fill_data.bak.json`, or restore an emergency IndexedDB snapshot from Settings.
+- **JSON import fails**: confirm the file is a PromptFill export or full backup. Imports are shape-checked before they can replace or merge data.
+- **AI features do not respond**: add a Gemini key in Settings, test it there, and confirm before sending prompt content to Gemini.
+- **Build fails after pulling changes**: run `npm install`, then `npm run check`.
+
+### Contribution Notes
+
+- Keep new parsing, import/export, storage, and merge behavior covered by focused tests in `src/utils/`.
+- Do not log or export Gemini keys, prompt content sent for consent checks, debug metadata, or local-only AI settings.
+- Add user-facing strings to the existing translation flow instead of hardcoding a single language.
+- Prefer small helper extraction around fragile logic rather than broad rewrites of `App.jsx`.
+- Avoid adding Docker, Tauri production wiring, or backend requirements for ordinary web development.
+
+### Dependency Maintenance
+
+Use these commands when reviewing or updating dependencies:
+
+```bash
+npm install
+npm audit
+npm outdated
+npm run lint
+npm run test
+npm run build
+npm run check
+```
+
+Apply dependency updates cautiously. Start with safe patch/minor updates and non-force audit fixes after `npm run check` passes. Defer broad major upgrades until they are deliberately planned and verified.
+
+This fork is browser-first for the current milestone. Tauri desktop packaging is experimental and unsupported for `v0.1.0-byok-alpha`; the Tauri dependencies and script are kept only while they do not block install or browser builds. Do not add desktop packaging work in ordinary browser-focused changes.
+
+React remains on 18 for now. React 19 migration is deferred until after `v0.1.0-byok-alpha` so BYOK functionality, storage safety, and test coverage stay the priority.
 
 ---
 

@@ -2,6 +2,7 @@
 import React, { useRef, useEffect, useCallback, useImperativeHandle, useState } from 'react';
 import { CATEGORY_STYLES } from '../constants/styles';
 import { AutoCompletePanel } from './AutoCompletePanel';
+import { detectAutoComplete, parseInlineSyntax, parseVariableName } from '../utils/variableSyntax';
 
 // ============================================================
 // 核心工具函数：纯文本 ↔ DOM 双向转换 & 光标偏移映射
@@ -117,18 +118,6 @@ function setTextOffset(element, start, end) {
 // 解析工具
 // ============================================================
 
-function parseVariableName(varName) {
-  const match = varName.match(/^(.+?)(?:_(\d+))?$/);
-  if (match) return { baseKey: match[1], groupId: match[2] || null };
-  return { baseKey: varName, groupId: null };
-}
-
-function parseInlineSyntax(raw) {
-  const colonIdx = raw.indexOf(':');
-  if (colonIdx === -1) return { varPart: raw.trim(), inlineVal: null };
-  return { varPart: raw.slice(0, colonIdx).trim(), inlineVal: raw.slice(colonIdx + 1).trim() };
-}
-
 function escapeHTML(str) {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
@@ -144,30 +133,6 @@ function findVariableAtCursor(text, cursorPos) {
   while ((match = regex.exec(text)) !== null) {
     if (cursorPos > match.index && cursorPos < match.index + match[0].length) {
       return { start: match.index, end: match.index + match[0].length };
-    }
-  }
-  return null;
-}
-
-/**
- * 检测光标前是否处于补全触发状态
- * 返回 { triggerPos, triggerChar, rawQuery } 或 null
- */
-function detectAutoComplete(text, cursorPos, disableSlash = false) {
-  if (!text || cursorPos == null || cursorPos === 0) return null;
-  const before = text.substring(0, cursorPos);
-
-  // 向前扫描找最近的 { 或 /（不跨行、不跨 }）
-  for (let i = before.length - 1; i >= 0; i--) {
-    const ch = before[i];
-    if (ch === '\n' || ch === '}') return null;
-    if (ch === '{' || ch === '/') {
-      // 移动端禁用 / 触发（软键盘输入 / 体验差）
-      if (ch === '/' && disableSlash) return null;
-      // 确保 { 前面不是另一个 {（避免在 {{ 内部重复触发）
-      if (ch === '{' && i > 0 && before[i - 1] === '{') return null;
-      const rawQuery = before.substring(i + 1);
-      return { triggerPos: i, triggerChar: ch, rawQuery };
     }
   }
   return null;

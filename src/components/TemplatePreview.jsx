@@ -6,6 +6,7 @@ import { ImageIcon, ArrowUpRight, Upload, Globe, RotateCcw, Pencil, Check, X, Ch
 import { PremiumButton } from './PremiumButton';
 import { WaypointsIcon } from './icons/WaypointsIcon';
 import { getLocalized, getVideoEmbedInfo } from '../utils/helpers';
+import { parseInlineSyntax, parseVariableName } from '../utils/variableSyntax';
 import { OptimizedImage } from './OptimizedImage';
 import { useResolvedFolderMediaSrc } from '../context/FolderStorageContext';
 import { isFolderMediaPath } from '../utils/folderImages';
@@ -214,28 +215,6 @@ export const TemplatePreview = React.memo(({
   const showLanguageToggle = templateLangs.length > 1;
   const isVideo = activeTemplate.type === 'video';
   const sources = activeTemplate.source || [];
-
-  // 变量解析工具函数：从变量名中提取 baseKey 和 groupId
-  const parseVariableName = (varName) => {
-    const match = varName.match(/^(.+?)(?:_(\d+))?$/);
-    if (match) {
-      return {
-        baseKey: match[1],
-        groupId: match[2] || null
-      };
-    }
-    return { baseKey: varName, groupId: null };
-  };
-
-  // 解析 {{A: val}} 或 {{A}} 语法
-  const parseInlineSyntax = (raw) => {
-    const colonIdx = raw.indexOf(':');
-    if (colonIdx === -1) return { varPart: raw.trim(), inlineVal: null };
-    return {
-      varPart: raw.slice(0, colonIdx).trim(),
-      inlineVal: raw.slice(colonIdx + 1).trim() || null,
-    };
-  };
 
   // 组件顶层派生 localOptions，供 parseLineWithVariables 直接访问（闭包）
   const localOptions = activeTemplate.localOptions || {};
