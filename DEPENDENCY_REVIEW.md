@@ -6,7 +6,7 @@ Environment used:
 
 - Node: v24.18.0
 - npm: 11.16.0
-- npm cache: project-local `.npm-cache` was used because the Windows user npm cache is not writable in this environment.
+- npm cache: project-local `.npm-cache` was used because the Windows user npm cache was not writable from Codex.
 
 ## Commands Run
 
@@ -16,51 +16,48 @@ npm outdated
 npm run check
 ```
 
-`npm run check` did not complete in this Codex sandbox. Vitest/Vite failed while esbuild tried to read a parent directory:
+`npm run check` now passes:
 
-```text
-Cannot read directory "../../..": Access is denied.
-Could not resolve "C:\\Users\\gostp\\Desktop\\Projects\\PromptFill\\vitest.config.js"
-```
+- 5 test files passed.
+- 12 tests passed.
+- Production build completed with Vite 8.1.0.
 
-This is the same local Windows filesystem/ACL limitation observed during Phase 5. Because the check command is blocked, this phase does not apply dependency upgrades.
+Build warnings remain from dependencies/tooling:
+
+- `lottie-web` uses direct `eval`.
+- The main app chunk is larger than 500 kB.
+- Some dynamic imports are ineffective because the same modules are also statically imported.
 
 ## Audit Summary
 
-`npm audit` reported 11 vulnerabilities:
+`npm audit` initially reported 11 vulnerabilities. After the dependency alignment and lockfile refresh, npm reports 0 vulnerabilities.
 
-- 1 low
-- 6 moderate
-- 3 high
-- 1 critical
+Changes made to restore a clean install/build state:
 
-Important findings:
-
-- `react-router` / `react-router-dom`: high severity advisories. `npm audit fix` reports a non-force fix is available.
-- `vite` / `esbuild`: moderate advisory. `npm audit fix --force` would jump to `vite@8.1.0`, which is a breaking upgrade and is deferred.
-- `@babel/core`: arbitrary file read advisory; non-force fix is available.
-- `brace-expansion`, `js-yaml`, `postcss`: moderate advisories; non-force fixes are available.
+- `vite` is on 8.1.0.
+- `vitest` is on 4.1.9.
+- `@vitejs/plugin-react` is aligned to the Vite 8-compatible 6.x line.
+- `esbuild` is installed explicitly because Vite 8 no longer bundles it for the current esbuild-based minify/transpile path.
+- `vite.config.js` uses `es2020` instead of the removed `modules` target.
 
 ## Outdated Direct Dependencies
 
-Notable direct dependencies with newer versions:
+Notable direct dependencies with newer versions at review time:
 
-- `react-router-dom`: 7.13.2 current, 7.18.0 wanted/latest.
-- `@tailwindcss/typography`: 0.5.19 current, 0.5.20 wanted/latest.
-- `postcss`: 8.5.8 current, 8.5.16 wanted/latest.
-- `autoprefixer`: 10.4.27 current, 10.5.2 wanted/latest.
-- `framer-motion`: 12.38.0 current, 12.42.0 wanted/latest.
-- `tailwind-merge`: 3.5.0 current, 3.6.0 wanted/latest.
+- `react-router-dom`: patch/minor updates available.
+- `@tailwindcss/typography`: patch update available.
+- `postcss`: patch updates available.
+- `autoprefixer`: patch/minor updates available.
+- `framer-motion`: patch/minor updates available.
+- `tailwind-merge`: patch/minor updates available.
 - Tauri packages have patch/minor updates available.
-- Major upgrades are available for React, React DOM, Vite, Vitest, Tailwind, ESLint, lucide-react, pako, and Vercel Analytics.
+- Major upgrades remain available for React, React DOM, Tailwind, ESLint, lucide-react, pako, and Vercel Analytics.
 
 ## Decisions
 
-- No dependency upgrade is applied in this phase because `npm run check` is currently blocked by local filesystem permissions.
+- Vite and Vitest are now on current majors because the check path was unblocked and the audit/lockfile state had already moved forward.
 - React remains on 18. React 19 migration is deferred until after `v0.1.0-byok-alpha` because this milestone prioritizes BYOK functionality, storage safety, and tests.
-- Vite remains on 5. A future Vite upgrade should happen only after tests and build pass locally.
-- React Router should be the first upgrade candidate after the check command works, because the audit report includes high severity advisories with a non-force fix path.
-- PostCSS, Babel, brace-expansion, and js-yaml should be handled through a cautious non-force `npm audit fix` once verification is unblocked.
+- React Router remains at the current locked version because audit is now clean and routing behavior should be tested deliberately before changing it further.
 - Tauri is kept but quarantined as experimental. This fork remains browser-first for the current milestone, and desktop packaging is unsupported for `v0.1.0-byok-alpha`.
 
 ## Tauri Status
@@ -71,9 +68,8 @@ Desktop packaging is experimental and unsupported for `v0.1.0-byok-alpha`. Brows
 
 ## Next Safe Order
 
-1. Fix the local Windows permission issue that blocks Vitest/Vite config loading.
-2. Run `npm run check`.
-3. Apply non-force `npm audit fix`.
-4. Re-run `npm run check`.
-5. Consider safe patch/minor direct dependency updates.
-6. Defer major upgrades, especially React 19 and Vite major upgrades, to later phases.
+1. Keep `npm run check` green before applying more dependency changes.
+2. Consider safe patch/minor direct dependency updates only in small batches.
+3. Re-run `npm audit`, `npm outdated`, and `npm run check` after each batch.
+4. Defer React 19 migration to a dedicated future phase.
+5. Keep Tauri quarantined unless desktop packaging becomes a deliberate project goal.

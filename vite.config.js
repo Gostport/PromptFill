@@ -25,7 +25,7 @@ export default defineConfig({
     // 只有在 Tauri 构建时才应用特殊的 target
     target: process.env.TAURI_PLATFORM 
       ? (process.env.TAURI_PLATFORM == 'windows' ? 'chrome105' : 'safari13')
-      : 'modules', // 网页版使用标准的现代化模块 target
+      : 'es2020', // Vite 8/Rolldown requires an explicit ES target for web builds
     // 在非调试构建中不缩小代码，方便报错定位（可选）
     minify: !process.env.TAURI_DEBUG ? 'esbuild' : false,
     // 为调试构建生成源代码映射
