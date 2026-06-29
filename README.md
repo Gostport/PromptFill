@@ -103,6 +103,18 @@ This project supports short-link sharing via a private backend.
    ```
 3. **Fallback**: If no API is configured, the app automatically falls back to long URL sharing, which works offline and requires no server.
 
+### Privacy And Gemini BYOK
+
+Prompt data is stored in your browser by default. If you enable local folder mode, templates, banks, categories, and defaults are written to the folder you choose.
+
+Your Gemini API key is stored only in this browser's local storage. It is used from your device to call Gemini and is not included in template JSON exports, full backups, folder data, or share payloads. Clear it from Settings with the Gemini BYOK **Clear** button.
+
+Gemini receives prompt or template context only when you use an AI feature, such as Gemini Terms or Smart Split. The first content-sending AI request asks for confirmation before sending anything.
+
+JSON exports and backups are sanitized before download or sharing. Long URL sharing keeps sanitized data in the URL. Short-link sharing uploads sanitized data to the configured remote share service after confirmation.
+
+If local data is missing, use JSON backups, local folder mode files, or the emergency IndexedDB backup panel in Settings where available.
+
 ### Installation & Run
 
 1.  **Clone**

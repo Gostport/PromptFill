@@ -1,7 +1,7 @@
 // EditorToolbar 组件 - 编辑器工具栏
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Plus, Undo, Redo, Link, Unlink, ChevronDown, ChevronUp, Bug, X, Key, ChevronRight, RotateCcw } from 'lucide-react';
+import { Plus, Undo, Redo, Link, Unlink, ChevronDown, ChevronUp, Bug, X, ChevronRight, RotateCcw } from 'lucide-react';
 import { PremiumButton } from './PremiumButton';
 import { AI_SMART_SPLIT_ENABLED } from '../constants/aiConfig';
 
@@ -17,29 +17,8 @@ const DebugPanel = ({ isDarkMode, language, defaultSystemPrompt, defaultSystemPr
     const savedMode = localStorage.getItem('debug_split_mode') || 'classic';
     return savedMode === 'lite' ? (defaultSystemPromptLite || '') : (defaultSystemPrompt || '');
   });
-  const [apiKey, setApiKey] = useState(() => localStorage.getItem('debug_zhipu_api_key') || '');
-  const [model, setModel] = useState(() => localStorage.getItem('debug_split_model') || 'glm-4.5-air');
-  const [termsDebugEnabled, setTermsDebugEnabled] = useState(() => !!localStorage.getItem('debug_terms_model'));
-  const [termsModel, setTermsModel] = useState(() => localStorage.getItem('debug_terms_model') || 'glm-4.7-flash');
   const [isRunning, setIsRunning] = useState(false);
   const textareaRef = useRef(null);
-
-  // 词条调试开关变化时同步到 localStorage
-  const handleTermsDebugToggle = (enabled) => {
-    setTermsDebugEnabled(enabled);
-    if (enabled) {
-      localStorage.setItem('debug_terms_model', termsModel);
-    } else {
-      localStorage.removeItem('debug_terms_model');
-    }
-  };
-
-  const handleTermsModelChange = (newModel) => {
-    setTermsModel(newModel);
-    if (termsDebugEnabled) {
-      localStorage.setItem('debug_terms_model', newModel);
-    }
-  };
 
   // 自动调整文本框高度
   useEffect(() => {
@@ -49,19 +28,10 @@ const DebugPanel = ({ isDarkMode, language, defaultSystemPrompt, defaultSystemPr
     }
   }, [systemPrompt]);
 
-  const handleSaveKey = () => {
-    localStorage.setItem('debug_zhipu_api_key', apiKey);
-  };
-
   const handleRun = async () => {
-    if (!apiKey.trim()) {
-      alert(language === 'cn' ? '请先输入 API Key' : 'Please enter API Key first');
-      return;
-    }
-    localStorage.setItem('debug_zhipu_api_key', apiKey);
     setIsRunning(true);
     try {
-      await onRun({ systemPrompt, apiKey, model, splitMode });
+      await onRun({ systemPrompt, splitMode });
     } finally {
       setIsRunning(false);
     }
@@ -105,48 +75,6 @@ const DebugPanel = ({ isDarkMode, language, defaultSystemPrompt, defaultSystemPr
 
         {/* Body - scrollable */}
         <div className="overflow-y-auto flex-1 p-6 space-y-5">
-          {/* API Key + Model */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className={`text-[10px] font-black uppercase tracking-widest mb-1.5 flex items-center gap-1.5 ${labelColor}`}>
-                <Key size={11} /> API Key（智谱）
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="password"
-                  value={apiKey}
-                  onChange={e => setApiKey(e.target.value)}
-                  placeholder="zhipu-api-key..."
-                  className={`flex-1 text-xs px-3 py-2 rounded-xl border outline-none font-mono min-w-0 ${inputBg}`}
-                />
-                <button
-                  onClick={handleSaveKey}
-                  className={`text-[10px] font-bold px-3 py-2 rounded-xl border transition-all flex-shrink-0 ${isDarkMode ? 'border-white/10 text-gray-400 hover:bg-white/5' : 'border-gray-200 text-gray-500 hover:bg-gray-100'}`}
-                >
-                  {language === 'cn' ? '保存' : 'Save'}
-                </button>
-              </div>
-            </div>
-            <div>
-              <label className={`text-[10px] font-black uppercase tracking-widest mb-1.5 block ${labelColor}`}>模型</label>
-              <select
-                value={model}
-                onChange={e => { setModel(e.target.value); localStorage.setItem('debug_split_model', e.target.value); }}
-                className={`w-full text-xs px-3 py-2 rounded-xl border outline-none ${inputBg}`}
-              >
-                <option value="glm-5">glm-5（最新旗舰）</option>
-                <option value="glm-4.7">glm-4.7（思考版）</option>
-                <option value="glm-4.7-standard">glm-4.7（普通版）</option>
-                <option value="glm-4.7-flash">glm-4.7-flash</option>
-                <option value="glm-4.7-flashx">glm-4.7-flashx</option>
-                <option value="glm-4-plus">glm-4-plus（推荐）</option>
-                <option value="glm-4.5-air">glm-4.5-air（较快）</option>
-                <option value="glm-4-flash">glm-4-flash（最快）</option>
-                <option value="glm-z1-plus">glm-z1-plus（推理）</option>
-              </select>
-            </div>
-          </div>
-
           {/* 拆分方案选择 */}
           <div>
             <label className={`text-[10px] font-black uppercase tracking-widest mb-1.5 block ${labelColor}`}>拆分方案</label>
@@ -169,41 +97,6 @@ const DebugPanel = ({ isDarkMode, language, defaultSystemPrompt, defaultSystemPr
                 ? '经典模式：AI 返回完整 JSON（含变量名、选项、双语内容），提示词较长'
                 : '轻量模式：AI 只标注原文中的变量位置，自动匹配已有词库，速度极快'}
             </p>
-          </div>
-
-          {/* 智能词条调试区块 */}
-          <div className={`rounded-2xl border p-4 space-y-3 ${isDarkMode ? 'border-white/5 bg-white/2' : 'border-gray-100 bg-gray-50/50'}`}>
-            <div className="flex items-center justify-between">
-              <label className={`text-[10px] font-black uppercase tracking-widest ${labelColor}`}>
-                智能词条调试
-              </label>
-              <button
-                onClick={() => handleTermsDebugToggle(!termsDebugEnabled)}
-                className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${termsDebugEnabled ? 'bg-orange-500' : (isDarkMode ? 'bg-white/10' : 'bg-gray-300')}`}
-              >
-                <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${termsDebugEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
-              </button>
-            </div>
-            {termsDebugEnabled && (
-              <div>
-                <label className={`text-[10px] font-bold mb-1 block ${labelColor}`}>词条生成模型（前端直调）</label>
-                <select
-                  value={termsModel}
-                  onChange={e => handleTermsModelChange(e.target.value)}
-                  className={`w-full text-xs px-3 py-2 rounded-xl border outline-none ${inputBg}`}
-                >
-                  <option value="glm-4.7-flash">glm-4.7-flash</option>
-                  <option value="glm-4.7-flashx">glm-4.7-flashx</option>
-                  <option value="glm-4.7">glm-4.7（思考版）</option>
-                  <option value="glm-4.7-standard">glm-4.7（普通版）</option>
-                  <option value="glm-4.5-air">glm-4.5-air</option>
-                  <option value="glm-4-flash">glm-4-flash</option>
-                </select>
-                <p className={`text-[10px] mt-1.5 ${isDarkMode ? 'text-orange-500/60' : 'text-orange-500/70'}`}>
-                  ⚠️ 开启后点击变量「智能词条」将直接调用 GLM，不走后端
-                </p>
-              </div>
-            )}
           </div>
 
           {/* System Prompt Editor */}
@@ -239,7 +132,7 @@ const DebugPanel = ({ isDarkMode, language, defaultSystemPrompt, defaultSystemPr
             <p className={`text-[10px] mt-1.5 ${isDarkMode ? 'text-gray-600' : 'text-gray-400'}`}>
               {`${systemPrompt.length} 字符 · `}
               {splitMode === 'lite'
-                ? '步骤①标注拆分 → 步骤②自动翻译生成双语（两次请求，均使用上方模型）'
+                ? '步骤①标注拆分 → 步骤②自动翻译生成双语'
                 : '当前模板文本将追加在系统提示词之后发送给 AI'}
             </p>
           </div>
@@ -249,8 +142,8 @@ const DebugPanel = ({ isDarkMode, language, defaultSystemPrompt, defaultSystemPr
         <div className={`flex items-center justify-between gap-3 px-6 py-4 border-t flex-shrink-0 ${isDarkMode ? 'border-white/5' : 'border-gray-100'}`}>
           <p className={`text-[10px] ${isDarkMode ? 'text-gray-600' : 'text-gray-400'}`}>
             {splitMode === 'lite'
-              ? '⚠️ 轻量模式：①标注拆分 ②自动翻译双语（2次 API 调用）'
-              : '⚠️ 直接调用 GLM API，不经过后端'}
+              ? '⚠️ 轻量模式：①标注拆分 ②自动翻译双语'
+              : '⚠️ 使用 Settings 中保存的 Gemini BYOK 设置'}
           </p>
           <div className="flex gap-2">
             <button

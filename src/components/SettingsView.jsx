@@ -3,10 +3,24 @@ import {
   Globe, Database, Download, Upload,
   Trash2, Mail, MessageCircle, Github,
   ChevronRight, RefreshCw, FolderOpen, X, Heart,
-  Cloud
+  Cloud, Key, CheckCircle2
 } from 'lucide-react';
 import { openExternalLink } from '../utils/platform';
 import { EmergencyBackupPanel } from './EmergencyBackupPanel';
+import {
+  DEFAULT_GEMINI_MODEL,
+  GEMINI_SETTINGS_TEXT,
+} from '../constants/aiConfig';
+import {
+  clearApiKey,
+  getGeminiConsent,
+  getStoredApiKey,
+  getStoredGeminiModel,
+  storeApiKey,
+  storeGeminiConsent,
+  storeGeminiModel,
+  validateApiKey,
+} from '../utils/aiService';
 
 export const SettingsView = ({ 
   language, setLanguage, 
@@ -29,6 +43,12 @@ export const SettingsView = ({
   const [showWechatQR, setShowWechatQR] = useState(false);
   const [showCredits, setShowCredits] = useState(false);
   const [storageStats, setStorageStats] = React.useState(null);
+  const [geminiApiKeyInput, setGeminiApiKeyInput] = useState('');
+  const [hasGeminiApiKey, setHasGeminiApiKey] = useState(() => !!getStoredApiKey());
+  const [geminiModel, setGeminiModel] = useState(() => getStoredGeminiModel());
+  const [geminiConsent, setGeminiConsent] = useState(() => getGeminiConsent());
+  const [geminiStatus, setGeminiStatus] = useState('');
+  const [isTestingGemini, setIsTestingGemini] = useState(false);
 
   const isTauriMobile = !!(window.__TAURI_INTERNALS__ && /iPhone|iPad|iPod/i.test(navigator.userAgent));
   const iCloudStatusLabel = () => {
@@ -683,6 +703,40 @@ export const SettingsView = ({
     </button>
   );
 
+  const aiText = (key) => GEMINI_SETTINGS_TEXT[key]?.[language] || GEMINI_SETTINGS_TEXT[key]?.en || key;
+
+  const handleSaveGeminiSettings = () => {
+    if (geminiApiKeyInput.trim()) {
+      storeApiKey(geminiApiKeyInput);
+      setHasGeminiApiKey(true);
+      setGeminiApiKeyInput('');
+    }
+    storeGeminiModel(geminiModel);
+    storeGeminiConsent(geminiConsent);
+    setGeminiStatus(aiText('saved'));
+  };
+
+  const handleClearGeminiKey = () => {
+    clearApiKey();
+    setGeminiApiKeyInput('');
+    setHasGeminiApiKey(false);
+    setGeminiStatus('');
+  };
+
+  const handleTestGemini = async () => {
+    setIsTestingGemini(true);
+    setGeminiStatus('');
+    try {
+      const keyForTest = geminiApiKeyInput.trim() || getStoredApiKey();
+      await validateApiKey(keyForTest, geminiModel || DEFAULT_GEMINI_MODEL);
+      setGeminiStatus(language === 'cn' ? '连接成功' : 'Connection OK');
+    } catch (error) {
+      setGeminiStatus(error.message || (language === 'cn' ? '连接失败' : 'Connection failed'));
+    } finally {
+      setIsTestingGemini(false);
+    }
+  };
+
   return (
     <div style={globalContainerStyle} className="flex-1 flex flex-col h-full overflow-hidden relative">
       {/* Header Area - Parallel Titles */}
@@ -739,6 +793,80 @@ export const SettingsView = ({
                       {mode.label}
                     </button>
                   ))}
+                </div>
+              </div>
+            </SettingSection>
+
+            <SettingSection title={aiText('title')}>
+              <div className={`p-3 rounded-2xl border ${isDarkMode ? 'border-white/5 bg-white/[0.03]' : 'border-gray-100 bg-white/60'}`}>
+                <div className="flex items-center gap-2 mb-3">
+                  <Key size={16} className={isDarkMode ? 'text-orange-400' : 'text-orange-500'} />
+                  <div className="flex flex-col min-w-0">
+                    <span className={`text-[12px] font-black ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>{aiText('keyLabel')}</span>
+                    <span className={`text-[10px] font-bold opacity-60 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                      {hasGeminiApiKey ? aiText('saved') : aiText('keyPlaceholder')}
+                    </span>
+                  </div>
+                </div>
+
+                <input
+                  type="password"
+                  value={geminiApiKeyInput}
+                  onChange={(e) => setGeminiApiKeyInput(e.target.value)}
+                  placeholder={hasGeminiApiKey ? '••••••••••••••••' : aiText('keyPlaceholder')}
+                  className={`w-full px-3 py-2 rounded-xl text-xs font-mono outline-none border mb-2 ${isDarkMode ? 'bg-black/20 border-white/10 text-gray-200 placeholder:text-gray-700' : 'bg-white border-gray-200 text-gray-700 placeholder:text-gray-400'}`}
+                />
+
+                <label className={`text-[10px] font-black uppercase tracking-widest ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                  {aiText('modelLabel')}
+                </label>
+                <input
+                  type="text"
+                  value={geminiModel}
+                  onChange={(e) => setGeminiModel(e.target.value)}
+                  placeholder={DEFAULT_GEMINI_MODEL}
+                  className={`w-full px-3 py-2 rounded-xl text-xs font-mono outline-none border mt-1 mb-3 ${isDarkMode ? 'bg-black/20 border-white/10 text-gray-200' : 'bg-white border-gray-200 text-gray-700'}`}
+                />
+
+                <label className={`flex items-start gap-2 text-[11px] font-bold leading-relaxed mb-3 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                  <input
+                    type="checkbox"
+                    checked={geminiConsent}
+                    onChange={(e) => setGeminiConsent(e.target.checked)}
+                    className="mt-0.5 accent-orange-500"
+                  />
+                  <span>{aiText('consentLabel')}</span>
+                </label>
+
+                <p className={`text-[10px] leading-relaxed mb-3 ${isDarkMode ? 'text-gray-600' : 'text-gray-500'}`}>
+                  {aiText('privacyNote')}
+                </p>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleSaveGeminiSettings}
+                    className="px-3 py-2 rounded-xl bg-orange-500 text-white text-[10px] font-black uppercase tracking-widest"
+                  >
+                    {aiText('save')}
+                  </button>
+                  <button
+                    onClick={handleTestGemini}
+                    disabled={isTestingGemini || (!geminiApiKeyInput.trim() && !hasGeminiApiKey)}
+                    className={`px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border ${isDarkMode ? 'border-white/10 text-gray-400 disabled:opacity-30' : 'border-gray-200 text-gray-500 disabled:opacity-30'}`}
+                  >
+                    {isTestingGemini ? '...' : aiText('test')}
+                  </button>
+                  <button
+                    onClick={handleClearGeminiKey}
+                    className={`px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border ${isDarkMode ? 'border-white/10 text-gray-500' : 'border-gray-200 text-gray-400'}`}
+                  >
+                    {aiText('clear')}
+                  </button>
+                  {geminiStatus && (
+                    <span className={`flex items-center gap-1 text-[10px] font-bold truncate ${geminiStatus.includes('OK') || geminiStatus.includes('成功') || geminiStatus === aiText('saved') ? 'text-green-500' : 'text-red-500'}`}>
+                      <CheckCircle2 size={12} /> {geminiStatus}
+                    </span>
+                  )}
                 </div>
               </div>
             </SettingSection>

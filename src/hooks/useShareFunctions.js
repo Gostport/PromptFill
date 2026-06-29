@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { compressTemplate, decompressTemplate, copyToClipboard, getLocalized } from '../utils/helpers';
+import { compressTemplate, decompressTemplate, copyToClipboard, getLocalized, sanitizeExportPayload, sanitizeImportedPayload } from '../utils/helpers';
 import { PUBLIC_SHARE_URL } from '../data/templates';
 
 // ====== 私有后端配置 ======
@@ -116,12 +116,14 @@ export const useShareFunctions = (
   const [shareImportError, setShareImportError] = useState(null);
   const [isImportingShare, setIsImportingShare] = useState(false);
   const [shortCodeError, setShortCodeError] = useState(null);
+  const [remoteShareConfirmed, setRemoteShareConfirmed] = useState(false);
 
   // 当模板改变时重置预取码
   useEffect(() => {
     setPrefetchedShortCode(null);
     setIsPrefetching(false);
     setShortCodeError(null);
+    setRemoteShareConfirmed(false);
   }, [activeTemplate]);
 
   // 计算分享 URL（保留作为兜底的长链接预览，但在实际分享时会尝试生成短链）
@@ -172,7 +174,7 @@ export const useShareFunctions = (
         if (shareData.length <= 15) {
           try {
             const payload = await fetchShareByCode(shareData);
-            const decoded = decompressTemplate(payload);
+            const decoded = sanitizeImportedPayload(decompressTemplate(payload));
             if (decoded) {
               setSharedTemplateData(decoded);
               setShowShareImportModal(true);
@@ -189,7 +191,7 @@ export const useShareFunctions = (
           }
         } else {
           // --- 原有长链解析逻辑 ---
-          const decoded = decompressTemplate(shareData);
+          const decoded = sanitizeImportedPayload(decompressTemplate(shareData));
           if (decoded && decoded.name && decoded.content) {
             setSharedTemplateData(decoded);
             setShowShareImportModal(true);
@@ -285,7 +287,7 @@ export const useShareFunctions = (
       }
     }
 
-    const decoded = decompressTemplate(shareData);
+    const decoded = sanitizeImportedPayload(decompressTemplate(shareData));
     if (decoded && decoded.name && decoded.content) {
       setSharedTemplateData(decoded);
       setShowShareImportModal(true);
@@ -306,13 +308,14 @@ export const useShareFunctions = (
    */
   const handleImportSharedTemplate = useCallback(() => {
     if (!sharedTemplateData) return;
+    const cleanSharedTemplateData = sanitizeImportedPayload(sharedTemplateData);
 
     // --- 0. 先处理关联模版（linkedTemplates），建立 oldId -> newId 映射 ---
     const linkedTemplateIdMap = {}; // { originalId: newId }
     const linkedTemplatesToAdd = [];
 
-    if (sharedTemplateData.linkedTemplates && Array.isArray(sharedTemplateData.linkedTemplates)) {
-      sharedTemplateData.linkedTemplates.forEach((lt) => {
+    if (cleanSharedTemplateData.linkedTemplates && Array.isArray(cleanSharedTemplateData.linkedTemplates)) {
+      cleanSharedTemplateData.linkedTemplates.forEach((lt) => {
         const originalId = lt.originalId;
         if (!originalId) return;
 
@@ -337,10 +340,10 @@ export const useShareFunctions = (
     }
 
     let templateToImport = {
-      ...sharedTemplateData,
+      ...cleanSharedTemplateData,
       id: `tpl_shared_${Date.now()}`,
-      selections: sharedTemplateData.selections || {},
-      author: sharedTemplateData.author || t('official')
+      selections: cleanSharedTemplateData.selections || {},
+      author: cleanSharedTemplateData.author || t('official')
     };
 
     // 清除 linkedTemplates 字段（不需要存储到本地模版中）
@@ -357,8 +360,8 @@ export const useShareFunctions = (
     }
 
     const keyMap = {};
-    const banksToImport = sharedTemplateData.banks || {};
-    const categoriesToImport = sharedTemplateData.categories || {};
+    const banksToImport = cleanSharedTemplateData.banks || {};
+    const categoriesToImport = cleanSharedTemplateData.categories || {};
 
     // 1. 预扫描冲突的词库键名并建立映射
     // 按键名长度降序排序，避免替换时前缀冲突（如 bank 和 bank_extra）
@@ -496,8 +499,18 @@ export const useShareFunctions = (
    */
   const handleShareLink = useCallback(() => {
     setShowShareOptionsModal(true);
+    const confirmRemoteShare = () => {
+      const message = language === 'cn'
+        ? '生成短链接会把经过清理的分享数据上传到远程短链服务。取消后仍可使用本地长链接。继续生成短链接？'
+        : 'Short-link sharing uploads sanitized share data to the remote short-link service. Cancel to use a local long URL instead. Continue?';
+      const accepted = window.confirm(message);
+      setRemoteShareConfirmed(accepted);
+      return accepted;
+    };
+
     // 开始预取短码，避免在点击复制时才请求导致剪贴板权限丢失
     if (activeTemplate && !prefetchedShortCode && !isPrefetching) {
+      if (!confirmRemoteShare()) return;
       setIsPrefetching(true);
       setShortCodeError(null);
       const compressed = compressTemplate(activeTemplate, banks, categories, templates);
@@ -510,7 +523,7 @@ export const useShareFunctions = (
         setIsPrefetching(false);
       });
     }
-  }, [activeTemplate, banks, categories, templates, getShortCodeFromServer, prefetchedShortCode, isPrefetching]);
+  }, [activeTemplate, banks, categories, templates, getShortCodeFromServer, prefetchedShortCode, isPrefetching, language]);
 
   /**
    * 复制分享链接到剪贴板 (优先尝试短链接)
@@ -523,7 +536,7 @@ export const useShareFunctions = (
       const compressed = compressTemplate(activeTemplate, banks, categories, templates);
       let finalShareData = prefetchedShortCode;
 
-      if (!finalShareData) {
+      if (!finalShareData && remoteShareConfirmed) {
         try {
           const shortCode = await Promise.race([
             getShortCodeFromServer(compressed),
@@ -556,7 +569,7 @@ export const useShareFunctions = (
     } finally {
       setIsGenerating(false);
     }
-  }, [activeTemplate, getShortCodeFromServer, t, language, banks, categories, templates, prefetchedShortCode, shortCodeError]);
+  }, [activeTemplate, getShortCodeFromServer, t, language, banks, categories, templates, prefetchedShortCode, shortCodeError, remoteShareConfirmed]);
 
   /**
    * 复制分享口令 (支持短码)
@@ -569,7 +582,7 @@ export const useShareFunctions = (
       const compressed = compressTemplate(activeTemplate, banks, categories, templates);
       
       let finalToken = prefetchedShortCode || compressed;
-      if (!prefetchedShortCode) {
+      if (!prefetchedShortCode && remoteShareConfirmed) {
         try {
           const shortCode = await Promise.race([
             getShortCodeFromServer(compressed),
@@ -590,7 +603,7 @@ export const useShareFunctions = (
     } finally {
       setIsGenerating(false);
     }
-  }, [activeTemplate, language, getShortCodeFromServer, banks, categories, templates, prefetchedShortCode]);
+  }, [activeTemplate, language, getShortCodeFromServer, banks, categories, templates, prefetchedShortCode, remoteShareConfirmed]);
 
   /**
    * 复制原始 JSON 数据 (仅限本地开发使用)
@@ -604,7 +617,7 @@ export const useShareFunctions = (
         if (typeof val === 'object' && Object.keys(val).length === 0) return;
         cleanedSelections[key] = val;
       });
-      const cleanedTemplate = { ...activeTemplate, selections: cleanedSelections };
+      const cleanedTemplate = sanitizeExportPayload({ ...activeTemplate, selections: cleanedSelections });
       const dataStr = JSON.stringify(cleanedTemplate, null, 2);
       const success = await copyToClipboard(dataStr);
       if (success) {

@@ -44,7 +44,9 @@ const ShareOptionsModal = ({ isOpen, onClose, onCopyLink, onCopyToken, onCopyRaw
             {language === 'cn' ? '分享模版' : 'Share Template'}
           </h3>
           <p className={`text-xs font-bold mb-6 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-            {language === 'cn' ? '选择您喜欢的分享方式' : 'Choose your preferred sharing method'}
+            {language === 'cn'
+              ? '链接分享会生成长 URL；短链接会上传清理后的分享数据到远程服务。'
+              : 'Link sharing creates a long URL; short links upload sanitized share data to the remote service.'}
           </p>
 
           {/* 分享码展示区域 */}
@@ -86,7 +88,7 @@ const ShareOptionsModal = ({ isOpen, onClose, onCopyLink, onCopyToken, onCopyRaw
                   {isGenerating ? (language === 'cn' ? '正在复制...' : 'Copying...') : (language === 'cn' ? '链接分享' : 'Share via Link')}
                 </span>
                 <span className={`text-[10px] font-bold opacity-50`}>
-                  {language === 'cn' ? '复制完整 URL 链接' : 'Copy the full URL link'}
+                  {language === 'cn' ? '复制本地长 URL；确认后可使用远程短链接' : 'Copy local long URL; remote short link only after confirmation'}
                 </span>
               </div>
             </PremiumButton>
@@ -101,13 +103,13 @@ const ShareOptionsModal = ({ isOpen, onClose, onCopyLink, onCopyToken, onCopyRaw
               >
                 <div className="flex flex-col items-start ml-2 text-left">
                   <span className="text-sm font-black">
-                    {language === 'cn' ? '复制完整数据 (本地调试)' : 'Copy Full Data (Local)'}
-                  </span>
-                  <span className={`text-[10px] font-bold opacity-50`}>
-                    {language === 'cn' ? '直接复制模版 JSON 数据' : 'Copy raw template JSON data'}
-                  </span>
-                </div>
-              </PremiumButton>
+                  {language === 'cn' ? '复制完整数据 (本地调试)' : 'Copy Full Data (Local)'}
+                </span>
+                <span className={`text-[10px] font-bold opacity-50`}>
+                    {language === 'cn' ? '复制已清理的本地 JSON 数据' : 'Copy sanitized local JSON data'}
+                </span>
+              </div>
+            </PremiumButton>
             )}
 
             {/* 暂时注释口令分享按钮

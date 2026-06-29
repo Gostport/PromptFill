@@ -155,6 +155,65 @@ function tryRepairAndParseJson(str) {
   }
 }
 
+const SECRET_KEY_PATTERNS = [
+  /api[_-]?key/i,
+  /authorization/i,
+  /auth[_-]?header/i,
+  /access[_-]?token/i,
+  /refresh[_-]?token/i,
+  /client[_-]?secret/i,
+  /provider[_-]?secret/i,
+  /credential/i,
+  /password/i,
+  /debug[_-]?zhipu[_-]?api[_-]?key/i,
+  /debug[_-]?glm/i,
+  /debug[_-]?terms[_-]?model/i,
+  /promptfill[_-]?gemini[_-]?api[_-]?key/i,
+  /promptfill[_-]?gemini[_-]?model/i,
+  /promptfill[_-]?gemini[_-]?prompt[_-]?consent/i,
+  /promptfill[_-]?ai[_-]?first[_-]?use[_-]?consent/i,
+];
+
+const LOCAL_AI_SETTING_KEYS = new Set([
+  'promptfill_gemini_api_key_v1',
+  'promptfill_gemini_model_v1',
+  'promptfill_gemini_prompt_consent_v1',
+  'promptfill_ai_provider_v1',
+  'promptfill_ai_model_v1',
+  'promptfill_ai_first_use_consent',
+  'debug_zhipu_api_key',
+  'debug_split_model',
+  'debug_terms_model',
+  'debug_split_mode',
+]);
+
+function shouldDropImportKey(key) {
+  const normalized = String(key || '').trim();
+  if (!normalized) return false;
+  if (LOCAL_AI_SETTING_KEYS.has(normalized)) return true;
+  return SECRET_KEY_PATTERNS.some((pattern) => pattern.test(normalized));
+}
+
+function sanitizeImportedPayload(value, seen = new WeakSet()) {
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitizeImportedPayload(item, seen));
+  }
+  if (!value || typeof value !== 'object') return value;
+  if (seen.has(value)) return undefined;
+  seen.add(value);
+
+  const clean = {};
+  Object.entries(value).forEach(([key, nestedValue]) => {
+    if (shouldDropImportKey(key)) return;
+    const sanitizedValue = sanitizeImportedPayload(nestedValue, seen);
+    if (sanitizedValue !== undefined) {
+      clean[key] = sanitizedValue;
+    }
+  });
+  seen.delete(value);
+  return clean;
+}
+
 /**
  * 从输入中提取分享数据
  */
@@ -165,7 +224,7 @@ function extractShareData(input) {
   if (shareData.startsWith('{')) {
     const parsed = tryRepairAndParseJson(shareData);
     if (parsed && (parsed.name || parsed.n || parsed.content || parsed.c)) {
-      return parsed;
+      return sanitizeImportedPayload(parsed);
     }
   }
 
@@ -183,7 +242,7 @@ function extractShareData(input) {
 
   // 尝试解压
   const decompressed = decompressTemplate(shareData);
-  if (decompressed) return decompressed;
+  if (decompressed) return sanitizeImportedPayload(decompressed);
 
   return null;
 }

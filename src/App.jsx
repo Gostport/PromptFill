@@ -16,7 +16,7 @@ import { MASONRY_STYLES } from './constants/masonryStyles';
 import { SMART_SPLIT_CONFIRM_MESSAGE, SMART_SPLIT_CONFIRM_TITLE, SMART_SPLIT_BUTTON_TEXT } from './constants/modalMessages';
 
 // ====== 导入工具函数 ======
-import { deepClone, makeUniqueKey, waitForImageLoad, getLocalized, getSystemLanguage, compressTemplate, decompressTemplate, copyToClipboard, saveDirectoryHandle } from './utils';
+import { deepClone, makeUniqueKey, waitForImageLoad, getLocalized, getSystemLanguage, compressTemplate, decompressTemplate, copyToClipboard, saveDirectoryHandle, sanitizeExportPayload, sanitizeImportedPayload } from './utils';
 import { mergeTemplatesWithSystem, mergeBanksWithSystem } from './utils/merge';
 import { generateAITerms, polishAndSplitPrompt } from './utils/aiService';  // AI 服务
 import { uploadToICloud, downloadFromICloud } from './utils/icloud'; // iCloud 服务
@@ -1166,15 +1166,17 @@ const App = () => {
     // 中文字符占比 > 10% 判定为中文，否则判定为英文
     const chineseCharCount = (resolvedPrompt.match(/[\u4e00-\u9fa5]/g) || []).length;
     const detectedLang = chineseCharCount / Math.max(resolvedPrompt.length, 1) > 0.1 ? 'cn' : 'en';
-    if (detectedLang !== templateLanguage) {
+    if (detectedLang !== templateLanguage && import.meta.env.DEV) {
       console.log(`[SmartSplit] 语言自动修正: tab=${templateLanguage} → 检测到=${detectedLang}`);
     }
 
     // 检测替换情况（调试用）
     const hasVariables = /\{\{[^}]+\}\}/.test(templateText);
     const afterResolveHasVars = /\{\{[^}]+\}\}/.test(resolvedPrompt);
-    console.log('[SmartSplit] 变量替换:', hasVariables ? `已替换${afterResolveHasVars ? '（部分未替换）' : '完成'}` : '无变量');
-    console.log('[SmartSplit] 原始文本长度:', templateText.length, '→ 替换后:', resolvedPrompt.length);
+    if (import.meta.env.DEV) {
+      console.log('[SmartSplit] 变量替换:', hasVariables ? `已替换${afterResolveHasVars ? '（部分未替换）' : '完成'}` : '无变量');
+      console.log('[SmartSplit] 文本长度:', templateText.length, '→', resolvedPrompt.length);
+    }
 
     // 保存回滚快照（拆分前的完整状态）
     const rollbackSnapshot = {
@@ -1215,7 +1217,9 @@ const App = () => {
           return `- {{${key}}} (${label}) [示例: ${samples}]`;
         }).join('\n');
 
-      console.log(`[SmartSplit] 词库过滤: ${Object.keys(banks).length} → ${existingBankContext.split('\n').filter(Boolean).length} 个相关变量`);
+      if (import.meta.env.DEV) {
+        console.log(`[SmartSplit] 词库过滤: ${Object.keys(banks).length} → ${existingBankContext.split('\n').filter(Boolean).length} 个相关变量`);
+      }
 
       const result = await polishAndSplitPrompt({
         rawPrompt: resolvedPrompt,
@@ -1228,14 +1232,14 @@ const App = () => {
         splitMode,
       });
 
-      console.log('[App] Smart Split Result:', result);
-
       if (result) {
         // ── Lite 模式特殊处理：AI 返回标注文本 {{key::原词}}，匹配已有词库 ──
         if (result._liteMode) {
           const isBilingual = result._bilingual && typeof result.content === 'object' && result.content.cn && result.content.en;
           
-          console.log('[SmartSplit Lite] 检测到变量:', result.variables.map(v => `${v.key}=${v.default?.cn || v.default?.en}`), isBilingual ? '(双语)' : '(单语)');
+          if (import.meta.env.DEV) {
+            console.log('[SmartSplit Lite] 检测到变量数量:', result.variables.length, isBilingual ? '(双语)' : '(单语)');
+          }
 
           // 匹配已有词库，丰富 variables
           const enrichedVariables = result.variables.map(v => {
@@ -1251,7 +1255,9 @@ const App = () => {
                 const valEn = typeof opt === 'object' ? (opt.en || '') : opt;
                 return valCn === originalWordCn || valEn === originalWordEn;
               });
-              console.log(`[SmartSplit Lite] ✅ 命中词库: ${v.key} → "${originalWordCn}" / "${originalWordEn}"${alreadyExists ? '' : '（新增选项）'}`);
+              if (import.meta.env.DEV) {
+                console.log(`[SmartSplit Lite] 命中词库: ${v.key}${alreadyExists ? '' : '（新增选项）'}`);
+              }
               return {
                 key: v.key,
                 label: existingBank.label,
@@ -1260,7 +1266,9 @@ const App = () => {
                 default: originalOpt,
               };
             } else {
-              console.log(`[SmartSplit Lite] ⚡ 新变量: ${v.key} → "${originalWordCn}" / "${originalWordEn}"`);
+              if (import.meta.env.DEV) {
+                console.log(`[SmartSplit Lite] 新变量: ${v.key}`);
+              }
               return {
                 key: v.key,
                 label: { cn: v.key, en: v.key },
@@ -1294,7 +1302,9 @@ const App = () => {
         const lengthRatio = cleanResult.length / Math.max(cleanOriginal.length, 1);
         
         if (lengthRatio < 0.15 || lengthRatio > 3.5) {
-          console.warn('[SmartSplit] 结果与原文差异过大，触发回滚', { lengthRatio, original: cleanOriginal.length, result: cleanResult.length });
+          if (import.meta.env.DEV) {
+            console.warn('[SmartSplit] 结果与原文差异过大，触发回滚', { lengthRatio, original: cleanOriginal.length, result: cleanResult.length });
+          }
           throw new Error(language === 'cn' 
             ? `拆分结果与原文差异过大（比例 ${lengthRatio.toFixed(2)}），已自动回退` 
             : `Split result differs too much from original (ratio ${lengthRatio.toFixed(2)}), reverted automatically`);
@@ -1321,7 +1331,9 @@ const App = () => {
           let discardedVars = [];
 
           if (result.variables.length > MAX_VARIABLES) {
-            console.warn(`[SmartSplit] AI 返回了 ${result.variables.length} 个变量，强制截断为 ${MAX_VARIABLES} 个`);
+            if (import.meta.env.DEV) {
+              console.warn(`[SmartSplit] AI 返回了 ${result.variables.length} 个变量，强制截断为 ${MAX_VARIABLES} 个`);
+            }
             acceptedVars = result.variables.slice(0, MAX_VARIABLES);
             discardedVars = result.variables.slice(MAX_VARIABLES);
           }
@@ -1355,7 +1367,9 @@ const App = () => {
           // ── 写入接受的变量到 banks / defaults / selections ──
           acceptedVars.forEach(v => {
             if (!v.key || !v.options || !Array.isArray(v.options) || v.options.length === 0) {
-              console.warn('[SmartSplit] 跳过无效变量（缺少 key 或 options）:', v);
+              if (import.meta.env.DEV) {
+                console.warn('[SmartSplit] 跳过无效变量（缺少 key 或 options）');
+              }
               return;
             }
 
@@ -1413,7 +1427,9 @@ const App = () => {
           setTempTemplateName(typeof result.name === 'string' ? result.name : (result.name[language] || result.name.cn || result.name.en));
         }
 
-        console.log('[App] Smart Split Success');
+        if (import.meta.env.DEV) {
+          console.log('[App] Smart Split Success');
+        }
 
         // 6. 保存原文快照（供用户查看原文 / 重新拆分使用）
         const varCount = result.variables?.length || 0;
@@ -1430,7 +1446,9 @@ const App = () => {
         setIsEditing(false);
       }
     } catch (error) {
-      console.error('[App] Smart Split Error:', error);
+      if (import.meta.env.DEV) {
+        console.error('[App] Smart Split Error:', error?.message || error);
+      }
 
       // 执行回滚：恢复到拆分前的快照
       try {
@@ -1449,7 +1467,9 @@ const App = () => {
           return t;
         }));
         setTempTemplateName(rollbackSnapshot.tempName);
-        console.log('[App] Smart Split Rolled Back Successfully');
+        if (import.meta.env.DEV) {
+          console.log('[App] Smart Split Rolled Back Successfully');
+        }
       } catch (rollbackError) {
         console.error('[App] Rollback Failed:', rollbackError);
       }
@@ -1647,12 +1667,6 @@ ${tagsHint ? `\n${tagsHint}` : ''}
   }, [activeTemplate, templateLanguage, language, performSmartSplit]);
 
   const handleGenerateAITerms = React.useCallback(async (params) => {
-    console.log('[App] AI Generation Request:', params);
-
-    // 调试模式：读取 localStorage 中设置的词条调试模型
-    const debugTermsModel = localStorage.getItem('debug_terms_model');
-    const debugApiKey = localStorage.getItem('debug_zhipu_api_key');
-
     // 收集当前模板中已选择的所有变量值，用于 AI 上下文理解
     const selectedValues = {};
     if (activeTemplate?.selections) {
@@ -1702,19 +1716,17 @@ ${tagsHint ? `\n${tagsHint}` : ''}
       });
     }
 
-    console.log('[App] Selected values for AI context:', selectedValues);
-
     // 调用 AI 服务生成词条，传递已选择的值
     try {
       const result = await generateAITerms({
         ...params,
         selectedValues,
-        ...(debugTermsModel && { debugModel: debugTermsModel, debugApiKey }),
       });
-      console.log('[App] AI Generation Result:', result);
       return result;
     } catch (error) {
-      console.error('[App] AI Generation Error:', error);
+      if (import.meta.env.DEV) {
+        console.error('[App] AI Generation Error:', error?.message || error);
+      }
       throw error;
     }
   }, [activeTemplate, language]);
@@ -2366,7 +2378,7 @@ ${tagsHint ? `\n${tagsHint}` : ''}
             if (typeof val === 'object' && Object.keys(val).length === 0) return;
             cleanedSelections[key] = val;
           });
-          const cleanedTemplate = { ...template, selections: cleanedSelections };
+          const cleanedTemplate = sanitizeExportPayload({ ...template, selections: cleanedSelections });
           const dataStr = JSON.stringify(cleanedTemplate, null, 2);
           const dataBlob = new Blob([dataStr], { type: 'application/json' });
           const filename = `${templateName.replace(/\s+/g, '_')}_template.json`;
@@ -2436,13 +2448,13 @@ ${tagsHint ? `\n${tagsHint}` : ''}
             return;
           }
 
-          const exportData = {
+          const exportData = sanitizeExportPayload({
               templates: exportTemplates,
               banks,
               categories,
               version: 'v9',
               exportDate: new Date().toISOString()
-          };
+          });
           const dataStr = JSON.stringify(exportData, null, 2);
           const dataBlob = new Blob([dataStr], { type: 'application/json' });
           const filename = `prompt_fill_backup_${Date.now()}.json`;
@@ -2503,21 +2515,21 @@ ${tagsHint ? `\n${tagsHint}` : ''}
       const reader = new FileReader();
       reader.onload = (e) => {
           try {
-              const data = JSON.parse(e.target.result);
+              const data = sanitizeImportedPayload(JSON.parse(e.target.result));
               
               // 检查是单个模板还是完整备份
               if (data.templates && Array.isArray(data.templates)) {
                   // 完整备份
                   if (window.confirm('检测到完整备份文件。是否要覆盖当前所有数据？')) {
-                      setTemplates(data.templates);
-                      if (data.banks) setBanks(data.banks);
-                      if (data.categories) setCategories(data.categories);
+                      setTemplates(sanitizeImportedPayload(data.templates));
+                      if (data.banks) setBanks(sanitizeImportedPayload(data.banks));
+                      if (data.categories) setCategories(sanitizeImportedPayload(data.categories));
                       alert('导入成功！');
                   }
               } else if (data.id && data.name) {
                   // 单个模板
                   const newId = `tpl_${Date.now()}`;
-                  const newTemplate = { ...data, id: newId };
+                  const newTemplate = sanitizeImportedPayload({ ...data, id: newId });
                   setTemplates(prev => [...prev, newTemplate]);
                   setActiveTemplateId(newId);
                   alert('模板导入成功！');
@@ -3043,8 +3055,12 @@ ${tagsHint ? `\n${tagsHint}` : ''}
     
     try {
         const compressed = compressTemplate(activeTemplate, banks, categories);
-        // 尝试向服务器换取短码
-        const shortCode = await getShortCodeFromServer(compressed);
+        const allowRemoteShortLink = window.confirm(
+          language === 'cn'
+            ? '图片导出的二维码可使用短链接。生成短链接会把经过清理的分享数据上传到远程短链服务。取消后将使用本地长链接。继续？'
+            : 'Image export can use a short-link QR code. Creating it uploads sanitized share data to the remote short-link service. Cancel to use a local long URL. Continue?'
+        );
+        const shortCode = allowRemoteShortLink ? await getShortCodeFromServer(compressed) : null;
         const base = PUBLIC_SHARE_URL || displayUrl;
         const normalizedBase = base.endsWith('/') ? base.slice(0, -1) : base;
         

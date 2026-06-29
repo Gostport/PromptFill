@@ -9,6 +9,8 @@
  * - 默认紧凑 JSON；可选 pretty 导出（体积更大）。
  */
 
+import { sanitizeExportPayload, sanitizeImportedPayload } from './helpers';
+
 export const FOLDER_DATA_FILE = 'prompt_fill_data.json';
 export const FOLDER_DATA_TEMP = 'prompt_fill_data.json.tmp';
 export const FOLDER_DATA_BAK = 'prompt_fill_data.bak.json';
@@ -18,7 +20,7 @@ const LEGACY_BAK2 = 'prompt_fill_data.bak2.json';
 const LEGACY_PERIODIC = 'prompt_fill_data.periodic.bak.json';
 
 function buildPayload(snapshot) {
-  return {
+  return sanitizeExportPayload({
     templates: snapshot.templates,
     banks: snapshot.banks,
     categories: snapshot.categories,
@@ -26,7 +28,7 @@ function buildPayload(snapshot) {
     version: snapshot.version || 'v9',
     lastSaved: new Date().toISOString(),
     saveSeq: Date.now(),
-  };
+  });
 }
 
 /** 校验是否为可加载的存档结构（避免空数组或半截数据误提交） */
@@ -113,7 +115,7 @@ export async function readPromptFillDataFile(directoryHandle) {
         if (label !== 'main') {
           console.warn(`[folderStorage] 已使用 ${name} 恢复数据（主文件不可用）`);
         }
-        return { ok: true, data: parsed.data, source: name };
+        return { ok: true, data: sanitizeImportedPayload(parsed.data), source: name };
       }
       lastError = parsed;
     } catch (e) {
@@ -130,10 +132,11 @@ export async function readPromptFillDataFile(directoryHandle) {
 
 export function applyPromptFillDataPayload(data, { setTemplates, setBanks, setCategories, setDefaults }) {
   if (!data || typeof data !== 'object') return;
-  if (data.templates) setTemplates(data.templates);
-  if (data.banks) setBanks(data.banks);
-  if (data.categories) setCategories(data.categories);
-  if (data.defaults) setDefaults(data.defaults);
+  const clean = sanitizeImportedPayload(data);
+  if (clean.templates) setTemplates(clean.templates);
+  if (clean.banks) setBanks(clean.banks);
+  if (clean.categories) setCategories(clean.categories);
+  if (clean.defaults) setDefaults(clean.defaults);
 }
 
 /**

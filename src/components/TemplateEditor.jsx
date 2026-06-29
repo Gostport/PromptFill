@@ -199,7 +199,7 @@ export const TemplateEditor = React.memo(({
   // AI 相关（预留接口）
   onGenerateAITerms = null,  // AI 生成词条的回调函数
   onSmartSplitClick = null,  // 智能拆分的回调函数
-  onDebugSplitRun = null,    // 调试模式：前端直调GLM
+  onDebugSplitRun = null,    // 调试模式：使用当前 BYOK AI 设置
   getDebugSystemPrompt = null, // 调试模式：获取默认系统提示词
   getDebugSystemPromptLite = null, // 调试模式：获取轻量模式系统提示词
   isSmartSplitLoading = false, // 智能拆分加载状态

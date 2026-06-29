@@ -4,6 +4,74 @@ import pako from 'pako';
 
 // ... (existing code)
 
+const SECRET_KEY_PATTERNS = [
+  /api[_-]?key/i,
+  /authorization/i,
+  /auth[_-]?header/i,
+  /access[_-]?token/i,
+  /refresh[_-]?token/i,
+  /client[_-]?secret/i,
+  /provider[_-]?secret/i,
+  /credential/i,
+  /password/i,
+  /debug[_-]?zhipu[_-]?api[_-]?key/i,
+  /debug[_-]?glm/i,
+  /debug[_-]?terms[_-]?model/i,
+  /promptfill[_-]?gemini[_-]?api[_-]?key/i,
+  /promptfill[_-]?gemini[_-]?model/i,
+  /promptfill[_-]?gemini[_-]?prompt[_-]?consent/i,
+  /promptfill[_-]?ai[_-]?first[_-]?use[_-]?consent/i,
+];
+
+const LOCAL_AI_SETTING_KEYS = new Set([
+  'promptfill_gemini_api_key_v1',
+  'promptfill_gemini_model_v1',
+  'promptfill_gemini_prompt_consent_v1',
+  'promptfill_ai_provider_v1',
+  'promptfill_ai_model_v1',
+  'promptfill_ai_first_use_consent',
+  'debug_zhipu_api_key',
+  'debug_split_model',
+  'debug_terms_model',
+  'debug_split_mode',
+]);
+
+const shouldDropExportKey = (key) => {
+  const normalized = String(key || '').trim();
+  if (!normalized) return false;
+  if (LOCAL_AI_SETTING_KEYS.has(normalized)) return true;
+  return SECRET_KEY_PATTERNS.some((pattern) => pattern.test(normalized));
+};
+
+const sanitizeData = (value, seen) => {
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitizeData(item, seen));
+  }
+
+  if (!value || typeof value !== 'object') {
+    return value;
+  }
+
+  if (seen.has(value)) {
+    return undefined;
+  }
+  seen.add(value);
+
+  const clean = {};
+  Object.entries(value).forEach(([key, nestedValue]) => {
+    if (shouldDropExportKey(key)) return;
+    const sanitizedValue = sanitizeData(nestedValue, seen);
+    if (sanitizedValue !== undefined) {
+      clean[key] = sanitizedValue;
+    }
+  });
+  seen.delete(value);
+  return clean;
+};
+
+export const sanitizeExportPayload = (payload) => sanitizeData(payload, new WeakSet());
+export const sanitizeImportedPayload = (payload) => sanitizeExportPayload(payload);
+
 // 复制文本到剪贴板 (带手机端兼容性 fallback + Tauri 支持)
 export const copyToClipboard = async (text) => {
   if (typeof window === 'undefined') return false;
@@ -76,28 +144,32 @@ export const copyToClipboard = async (text) => {
 export const compressTemplate = (data, banks = null, categories = null, templates = null) => {
   try {
     if (!data) return null;
+    const safeData = sanitizeExportPayload(data);
+    const safeBanks = sanitizeExportPayload(banks);
+    const safeCategories = sanitizeExportPayload(categories);
+    const safeTemplates = sanitizeExportPayload(templates);
 
     // 1. 提取核心数据，过滤掉巨大的 Base64 图像
-    const simplifiedData = (data.n && data.c) ? {
-      ...data,
-      s: data.s || data.selections || {} // 确保 selections 被包含 (s 为精简键名)
+    const simplifiedData = (safeData.n && safeData.c) ? {
+      ...safeData,
+      s: safeData.s || safeData.selections || {} // 确保 selections 被包含 (s 为精简键名)
     } : {
-      n: data.name || "",
-      c: data.content || "",
-      t: data.tags || [],
-      a: data.author || 'User',
-      l: data.language || ['cn', 'en'],
-      i: (typeof data.imageUrl === 'string' && data.imageUrl.startsWith('http')) ? data.imageUrl : "",
-      s: data.selections || {}, // s for selections
+      n: safeData.name || "",
+      c: safeData.content || "",
+      t: safeData.tags || [],
+      a: safeData.author || 'User',
+      l: safeData.language || ['cn', 'en'],
+      i: (typeof safeData.imageUrl === 'string' && safeData.imageUrl.startsWith('http')) ? safeData.imageUrl : "",
+      s: safeData.selections || {}, // s for selections
       // --- 新增视频模板相关字段 ---
-      ty: data.type || 'image',    // ty for type
-      vu: data.videoUrl || "",     // vu for videoUrl
-      src: data.source || []       // src for source
+      ty: safeData.type || 'image',    // ty for type
+      vu: safeData.videoUrl || "",     // vu for videoUrl
+      src: safeData.source || []       // src for source
     };
 
     // 1.5 如果提供了 templates，打包 source 中关联的模版（一层，不递归）
-    if (templates) {
-      const sourceArr = data.source || [];
+    if (safeTemplates) {
+      const sourceArr = safeData.source || [];
       const linkedTemplateIds = [...new Set(
         sourceArr.filter(s => s.templateId).map(s => s.templateId)
       )];
@@ -105,7 +177,7 @@ export const compressTemplate = (data, banks = null, categories = null, template
       if (linkedTemplateIds.length > 0) {
         const linkedTemplates = [];
         linkedTemplateIds.forEach(tid => {
-          const linkedTpl = templates.find(t => t.id === tid);
+          const linkedTpl = safeTemplates.find(t => t.id === tid);
           if (linkedTpl) {
             // 精简关联模版数据（不传 templates 参数，避免递归）
             const ltData = {
@@ -139,7 +211,7 @@ export const compressTemplate = (data, banks = null, categories = null, template
     }
 
     // 2. 如果提供了 banks，提取模板中使用的自定义词库
-    if (banks) {
+    if (safeBanks) {
       const contentStr = typeof simplifiedData.c === 'object' 
         ? Object.values(simplifiedData.c).join(' ') 
         : simplifiedData.c;
@@ -159,11 +231,11 @@ export const compressTemplate = (data, banks = null, categories = null, template
       const relevantCategories = {};
       
       baseKeys.forEach(key => {
-        if (banks[key]) {
-          relevantBanks[key] = banks[key];
-          const catId = banks[key].category;
-          if (categories && categories[catId]) {
-            relevantCategories[catId] = categories[catId];
+        if (safeBanks[key]) {
+          relevantBanks[key] = safeBanks[key];
+          const catId = safeBanks[key].category;
+          if (safeCategories && safeCategories[catId]) {
+            relevantCategories[catId] = safeCategories[catId];
           }
         }
       });
@@ -258,7 +330,7 @@ export const decompressTemplate = (compressedBase64) => {
       }));
     }
 
-    return result;
+    return sanitizeImportedPayload(result);
   } catch (error) {
     console.error('Decompression error:', error);
     return null;

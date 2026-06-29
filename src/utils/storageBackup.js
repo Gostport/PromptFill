@@ -5,6 +5,7 @@
 
 import { dbSet, dbGet, dbListAppDataKeys, dbDeleteAppDataKey } from './db';
 import { INITIAL_TEMPLATES_CONFIG } from '../data/templates';
+import { sanitizeExportPayload, sanitizeImportedPayload } from './helpers';
 
 const PREFIX = 'pf_emergency_';
 const KEEP_LAST = 14;
@@ -152,6 +153,7 @@ export function mergeFolderDiskIntoMemoryState({
  * diskData 须含 templates；banks/categories/defaults 可选。
  */
 export function applyMergedFolderPayloadToState(diskData, memoryState, setters, options = {}) {
+  const cleanDiskData = sanitizeImportedPayload(diskData);
   const {
     templates: memoryTemplates,
     banks: memoryBanks,
@@ -167,19 +169,19 @@ export function applyMergedFolderPayloadToState(diskData, memoryState, setters, 
 
   const folderModeStartupMerge = options.folderModeStartupMerge === true;
 
-  if (!diskData || !Array.isArray(diskData.templates)) {
+  if (!cleanDiskData || !Array.isArray(cleanDiskData.templates)) {
     return { addedFromDisk: 0 };
   }
 
   const merged = mergeFolderDiskIntoMemoryState({
     memoryTemplates,
-    diskTemplates: diskData.templates,
+    diskTemplates: cleanDiskData.templates,
     memoryBanks,
-    diskBanks: diskData.banks,
+    diskBanks: cleanDiskData.banks,
     memoryCategories,
-    diskCategories: diskData.categories,
+    diskCategories: cleanDiskData.categories,
     memoryDefaults,
-    diskDefaults: diskData.defaults,
+    diskDefaults: cleanDiskData.defaults,
     folderModeStartupMerge,
   });
 
@@ -188,7 +190,7 @@ export function applyMergedFolderPayloadToState(diskData, memoryState, setters, 
   setCategories(merged.categories);
   setDefaults(merged.defaults);
 
-  const addedFromDisk = countDiskOnlyUserTemplates(memoryTemplates, diskData.templates);
+  const addedFromDisk = countDiskOnlyUserTemplates(memoryTemplates, cleanDiskData.templates);
   return { addedFromDisk };
 }
 
@@ -215,7 +217,7 @@ export async function saveEmergencySnapshot(payload) {
   const record = {
     savedAt: new Date().toISOString(),
     version: 'v1',
-    ...payload,
+    ...sanitizeExportPayload(payload),
   };
   await dbSet(key, record);
   await pruneEmergencySnapshots();

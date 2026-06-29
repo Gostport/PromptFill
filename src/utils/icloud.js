@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { sanitizeExportPayload, sanitizeImportedPayload } from './helpers';
 
 const SYNC_FILE_NAME = 'prompt_fill_sync.json';
 const ICLOUD_CONTAINER_ID = 'iCloud.com.promptfill.app.v2';
@@ -20,7 +21,7 @@ export const uploadToICloud = async (data) => {
   const content = JSON.stringify({
     version: '1.0',
     timestamp,
-    payload: data
+    payload: sanitizeExportPayload(data)
   });
   
   try {
@@ -36,7 +37,9 @@ export const uploadToICloud = async (data) => {
     if (!exists) {
       return { ok: false, error: 'File not found after write' };
     }
-    console.log('[iCloud] Data uploaded successfully');
+    if (import.meta.env.DEV) {
+      console.log('[iCloud] Data uploaded successfully');
+    }
     return { ok: true, timestamp };
   } catch (error) {
     console.error('[iCloud] Upload failed:', error);
@@ -61,7 +64,7 @@ export const downloadFromICloud = async () => {
       containerId: ICLOUD_CONTAINER_ID,
       relativePath: SYNC_FILE_NAME
     });
-    return JSON.parse(content);
+    return sanitizeImportedPayload(JSON.parse(content));
   } catch (error) {
     console.error('[iCloud] Download failed:', error);
     return null;

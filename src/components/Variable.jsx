@@ -184,8 +184,17 @@ export const Variable = ({
         setAiError(AI_ERROR_MESSAGES.GENERATION_FAILED[language] || 'Generation failed');
       }
     } catch (error) {
-      console.error('[AI] Generation error:', error);
-      setAiError(AI_ERROR_MESSAGES.NETWORK_ERROR[language] || 'Network error');
+      if (import.meta.env.DEV) {
+        console.error('[AI] Generation error:', error?.message || error);
+      }
+      const message = error?.message || '';
+      if (message.includes('Missing Gemini API key')) {
+        setAiError(AI_ERROR_MESSAGES.NO_API_KEY[language] || 'Save your Gemini API key in Settings first');
+      } else if (message.includes('consent') || message.includes('declined')) {
+        setAiError(AI_ERROR_MESSAGES.NO_CONSENT[language] || 'Allow Gemini prompt consent in Settings first');
+      } else {
+        setAiError(AI_ERROR_MESSAGES.NETWORK_ERROR[language] || 'Network error');
+      }
     } finally {
       setIsAILoading(false);
     }
