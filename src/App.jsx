@@ -14,6 +14,7 @@ import { TRANSLATIONS } from './constants/translations';
 import { PREMIUM_STYLES, CATEGORY_STYLES, TAG_STYLES, TAG_LABELS } from './constants/styles';
 import { MASONRY_STYLES } from './constants/masonryStyles';
 import { SMART_SPLIT_CONFIRM_MESSAGE, SMART_SPLIT_CONFIRM_TITLE, SMART_SPLIT_BUTTON_TEXT } from './constants/modalMessages';
+import { FEATURE_FLAGS } from './constants/featureFlags';
 
 // ====== 导入工具函数 ======
 import { deepClone, makeUniqueKey, waitForImageLoad, getLocalized, getSystemLanguage, compressTemplate, decompressTemplate, copyToClipboard, saveDirectoryHandle, sanitizeExportPayload, sanitizeImportedPayload } from './utils';
@@ -150,6 +151,7 @@ const App = () => {
         
         if (cloudData && cloudData.payload) {
           const { timestamp, payload } = cloudData;
+          const cleanPayload = sanitizeImportedPayload(payload);
           // 这里的逻辑可以根据你的需求调整：是直接覆盖，还是弹出提示？
           // 为了安全起见，我们暂且只在控制台输出，或者你可以添加一个“发现云端数据”的提示
           console.log('[iCloud] 发现云端数据，时间戳:', new Date(timestamp).toLocaleString());
@@ -159,10 +161,10 @@ const App = () => {
           const lastLocalSync = lastICloudSyncAt || 0;
           if (timestamp > lastLocalSync || templates.length <= INITIAL_TEMPLATES_CONFIG.length) {
             if (window.confirm(language === 'cn' ? '发现更新的 iCloud 云端备份，是否恢复数据？' : 'Found newer iCloud backup, restore data?')) {
-              if (payload.templates) setTemplates(payload.templates);
-              if (payload.banks) setBanks(payload.banks);
-              if (payload.categories) setCategories(payload.categories);
-              if (payload.defaults) setDefaults(payload.defaults);
+              if (cleanPayload?.templates && Array.isArray(cleanPayload.templates)) setTemplates(cleanPayload.templates);
+              if (cleanPayload?.banks && typeof cleanPayload.banks === 'object') setBanks(cleanPayload.banks);
+              if (cleanPayload?.categories && typeof cleanPayload.categories === 'object') setCategories(cleanPayload.categories);
+              if (cleanPayload?.defaults && typeof cleanPayload.defaults === 'object') setDefaults(cleanPayload.defaults);
               setLastICloudSyncAt(timestamp);
             }
           }
@@ -406,8 +408,11 @@ const App = () => {
     return 0;
   };
 
-  // 从后端拉取最新系统数据并应用，返回是否成功拉取了新数据
-  const fetchAndApplyRemoteData = React.useCallback(async (currentVersion) => {
+  // 从后端拉取最新系统数据。只返回候选数据，不直接覆盖用户状态。
+  const fetchRemoteSystemData = React.useCallback(async (currentVersion) => {
+    if (!FEATURE_FLAGS.REMOTE_SYSTEM_DATA_ENABLED) {
+      return null;
+    }
     try {
       console.log("[Sync] 正在检查数据更新...");
 
@@ -439,14 +444,14 @@ const App = () => {
           const newTemplates = await tplRes.json();
           const newBanksData = await bankRes.json();
 
-          setTemplates(newTemplates.config || newTemplates);
-          setBanks(newBanksData.banks);
-          setDefaults(newBanksData.defaults);
-          setCategories(newBanksData.categories);
-          setLastAppliedDataVersion(maxVersion);
-
-          console.log("[Sync] 数据同步成功");
-          return true;
+          return {
+            version: maxVersion,
+            source: bestSource,
+            templates: newTemplates.config || newTemplates,
+            banks: newBanksData.banks,
+            defaults: newBanksData.defaults,
+            categories: newBanksData.categories,
+          };
         }
       } else {
         console.log("[Sync] 当前数据已是最新");
@@ -454,10 +459,10 @@ const App = () => {
     } catch (e) {
       console.warn("[Sync] 同步过程中出现非致命异常:", e.message);
     }
-    return false;
+    return null;
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // 已移除：启动时 useEffect([]) 静默 fetchAndApplyRemoteData — 会在 IndexedDB 加载完成后仍全量 setTemplates/setBanks，
+  // 已移除：启动时 useEffect([]) 静默远端同步 — 会在 IndexedDB 加载完成后仍全量 setTemplates/setBanks，
   // 覆盖用户数据与文件夹存储。远端同步请使用「刷新系统数据」内的 merge 流程或数据更新通知。
   // ================================
 
@@ -628,8 +633,25 @@ const App = () => {
                 : `Merged ${addedFromDisk} custom template(s) found only on disk. On startup, disk autosave wins for same custom id.`
             );
           }
-        } else if (readResult.ok === false && readResult.reason !== 'not_found') {
-          console.warn('[Folder] 读取 prompt_fill_data.json 失败:', readResult);
+        } else if (readResult.ok === false) {
+          console.warn('[Folder] 启动时未能安全读取 prompt_fill_data.json，已回退到浏览器存储:', readResult);
+          try {
+            const { writeFullAppStateToIndexedDB } = await import('./utils/db');
+            await writeFullAppStateToIndexedDB({ templates, banks, categories, defaults });
+          } catch (e) {
+            console.warn('[Storage] 文件夹启动失败后写回 IndexedDB 失败:', e);
+          }
+          setStorageMode('browser');
+          localStorage.setItem('app_storage_mode', 'browser');
+          setDirectoryHandle(null);
+          setNoticeMessage(
+            language === 'cn'
+              ? '未能安全读取本地文件夹数据，已切回浏览器存储以避免覆盖文件夹。'
+              : 'Could not safely read local folder data. Switched back to browser storage to avoid overwriting the folder.'
+          );
+          folderBootstrapCompleteRef.current = true;
+          setIsFileSystemDataHydrated(true);
+          return;
         }
         if (!cancelled) {
           setDirectoryHandle(handle);
@@ -2013,8 +2035,18 @@ ${tagsHint ? `\n${tagsHint}` : ''}
   const handleRefreshSystemData = React.useCallback(async () => {
     const backupSuffix = t('refreshed_backup_suffix') || '';
 
-    // 1. 先尝试拉取远端最新数据（静默，失败不影响后续 merge）
-    await fetchAndApplyRemoteData(lastAppliedDataVersion || SYSTEM_DATA_VERSION);
+    // 1. 远端系统数据默认关闭。若启用，只提示摘要，不直接覆盖当前数据。
+    const remoteData = await fetchRemoteSystemData(lastAppliedDataVersion || SYSTEM_DATA_VERSION);
+    if (remoteData) {
+      const remoteTemplateCount = Array.isArray(remoteData.templates) ? remoteData.templates.length : 0;
+      const remoteBankCount = remoteData.banks && typeof remoteData.banks === 'object' ? Object.keys(remoteData.banks).length : 0;
+      const proceed = window.confirm(
+        language === 'cn'
+          ? `发现远端系统数据 ${remoteData.version}。\n\n来源：${remoteData.source}\n系统模版：${remoteTemplateCount}\n系统词库：${remoteBankCount}\n\n将只通过安全合并流程刷新官方数据，并保留你的个人模版与自定义词条。继续？`
+          : `Remote system data ${remoteData.version} is available.\n\nSource: ${remoteData.source}\nSystem templates: ${remoteTemplateCount}\nSystem banks: ${remoteBankCount}\n\nThis will only continue through the safe merge flow and preserve personal templates/custom terms. Continue?`
+      );
+      if (!proceed) return;
+    }
 
     // 2. 迁移旧格式的 selections：将字符串值转换为对象格式
     const migratedTemplates = templates.map(tpl => {
@@ -2058,7 +2090,7 @@ ${tagsHint ? `\n${tagsHint}` : ''}
     } else {
       setNoticeMessage(t('refresh_done_no_conflict'));
     }
-  }, [banks, defaults, templates, t, fetchAndApplyRemoteData, lastAppliedDataVersion]);
+  }, [banks, defaults, templates, t, fetchRemoteSystemData, lastAppliedDataVersion, language]);
 
   // 监听来自 RootLayout Sidebar 的操作事件
   useEffect(() => {
@@ -2508,37 +2540,143 @@ ${tagsHint ? `\n${tagsHint}` : ''}
       }
   };
 
+  const validateImportedTemplate = (template) => (
+    template &&
+    typeof template === 'object' &&
+    typeof template.id === 'string' &&
+    template.id.trim().length > 0 &&
+    template.name &&
+    template.content
+  );
+
+  const summarizeImportPayload = (data) => {
+    if (!data || typeof data !== 'object') {
+      return { ok: false, reason: 'not_object' };
+    }
+
+    if (Array.isArray(data.templates)) {
+      const validTemplates = data.templates.filter(validateImportedTemplate);
+      if (validTemplates.length !== data.templates.length || validTemplates.length === 0) {
+        return { ok: false, reason: 'invalid_templates' };
+      }
+      return {
+        ok: true,
+        type: 'backup',
+        templateCount: validTemplates.length,
+        bankCount: data.banks && typeof data.banks === 'object' ? Object.keys(data.banks).length : 0,
+        categoryCount: data.categories && typeof data.categories === 'object' ? Object.keys(data.categories).length : 0,
+        defaultCount: data.defaults && typeof data.defaults === 'object' ? Object.keys(data.defaults).length : 0,
+      };
+    }
+
+    if (validateImportedTemplate(data)) {
+      return {
+        ok: true,
+        type: 'template',
+        templateCount: 1,
+        bankCount: data.banks && typeof data.banks === 'object' ? Object.keys(data.banks).length : 0,
+        categoryCount: data.categories && typeof data.categories === 'object' ? Object.keys(data.categories).length : 0,
+        defaultCount: data.defaults && typeof data.defaults === 'object' ? Object.keys(data.defaults).length : 0,
+      };
+    }
+
+    return { ok: false, reason: 'unknown_shape' };
+  };
+
+  const formatImportSummary = (summary) => (
+    language === 'cn'
+      ? `导入内容摘要：\n模版：${summary.templateCount}\n词库：${summary.bankCount}\n分类：${summary.categoryCount}\n默认值：${summary.defaultCount}`
+      : `Import summary:\nTemplates: ${summary.templateCount}\nBanks: ${summary.bankCount}\nCategories: ${summary.categoryCount}\nDefaults: ${summary.defaultCount}`
+  );
+
+  const mergeImportedBackup = (data) => {
+    const existingIds = new Set(templates.map((template) => template.id).filter(Boolean));
+    const importedTemplates = data.templates.map((template) => {
+      let id = template.id;
+      if (existingIds.has(id)) {
+        id = makeUniqueKey(id, existingIds, 'import');
+      }
+      existingIds.add(id);
+      return { ...template, id };
+    });
+
+    setTemplates((prev) => [...prev, ...importedTemplates]);
+    if (data.banks && typeof data.banks === 'object') {
+      setBanks((prev) => ({ ...data.banks, ...prev }));
+    }
+    if (data.categories && typeof data.categories === 'object') {
+      setCategories((prev) => ({ ...data.categories, ...prev }));
+    }
+    if (data.defaults && typeof data.defaults === 'object') {
+      setDefaults((prev) => ({ ...data.defaults, ...prev }));
+    }
+    if (importedTemplates[0]?.id) {
+      setActiveTemplateId(importedTemplates[0].id);
+    }
+  };
+
   const handleImportTemplate = (event) => {
       const file = event.target.files?.[0];
       if (!file) return;
 
       const reader = new FileReader();
-      reader.onload = (e) => {
+      reader.onload = async (e) => {
           try {
               const data = sanitizeImportedPayload(JSON.parse(e.target.result));
+              const summary = summarizeImportPayload(data);
+              if (!summary.ok) {
+                  alert(language === 'cn' ? '文件格式不正确或缺少有效模版' : 'Invalid file shape or no valid templates found');
+                  return;
+              }
               
               // 检查是单个模板还是完整备份
-              if (data.templates && Array.isArray(data.templates)) {
-                  // 完整备份
-                  if (window.confirm('检测到完整备份文件。是否要覆盖当前所有数据？')) {
+              if (summary.type === 'backup') {
+                  const choice = window.prompt(
+                    language === 'cn'
+                      ? `${formatImportSummary(summary)}\n\n输入 M 合并导入，输入 R 替换当前数据，留空或取消则不导入。`
+                      : `${formatImportSummary(summary)}\n\nType M to merge, R to replace current data, or leave blank/cancel to stop.`
+                  );
+                  const normalizedChoice = String(choice || '').trim().toLowerCase();
+                  if (!normalizedChoice) return;
+
+                  try {
+                    const { saveEmergencySnapshot } = await import('./utils/storageBackup');
+                    await saveEmergencySnapshot({
+                      reason: normalizedChoice === 'r' ? 'before_json_import_replace' : 'before_json_import_merge',
+                      templates,
+                      banks,
+                      categories,
+                      defaults,
+                    });
+                  } catch (backupError) {
+                    console.warn('[Backup] JSON 导入前快照失败:', backupError);
+                  }
+
+                  if (normalizedChoice === 'r') {
+                      if (!window.confirm(language === 'cn' ? '确认替换当前全部模版、词库、分类和默认值？' : 'Replace all current templates, banks, categories, and defaults?')) return;
                       setTemplates(sanitizeImportedPayload(data.templates));
                       if (data.banks) setBanks(sanitizeImportedPayload(data.banks));
                       if (data.categories) setCategories(sanitizeImportedPayload(data.categories));
-                      alert('导入成功！');
+                      if (data.defaults) setDefaults(sanitizeImportedPayload(data.defaults));
+                      alert(language === 'cn' ? '导入成功！' : 'Import complete');
+                  } else if (normalizedChoice === 'm') {
+                      mergeImportedBackup(data);
+                      alert(language === 'cn' ? '合并导入成功！' : 'Import merged');
+                  } else {
+                      alert(language === 'cn' ? '未识别的选择，已取消导入' : 'Unknown choice; import cancelled');
                   }
-              } else if (data.id && data.name) {
+              } else if (summary.type === 'template') {
                   // 单个模板
+                  if (!window.confirm(`${formatImportSummary(summary)}\n\n${language === 'cn' ? '导入这个模版？' : 'Import this template?'}`)) return;
                   const newId = `tpl_${Date.now()}`;
                   const newTemplate = sanitizeImportedPayload({ ...data, id: newId });
                   setTemplates(prev => [...prev, newTemplate]);
                   setActiveTemplateId(newId);
-                  alert('模板导入成功！');
-              } else {
-                  alert('文件格式不正确');
+                  alert(language === 'cn' ? '模板导入成功！' : 'Template imported');
               }
           } catch (error) {
               console.error('导入失败:', error);
-              alert('导入失败，请检查文件格式');
+              alert(language === 'cn' ? '导入失败，请检查文件格式' : 'Import failed. Check the file format.');
           }
       };
       reader.readAsText(file);
@@ -2647,8 +2785,13 @@ ${tagsHint ? `\n${tagsHint}` : ''}
       let loadedFromDisk = false;
 
       if (readResult.ok && readResult.data && Array.isArray(readResult.data.templates)) {
-        const loadFromDisk = window.confirm(t('folder_confirm_load_existing'));
-        if (loadFromDisk) {
+        const choice = window.prompt(t('folder_choice_existing'));
+        const normalizedChoice = String(choice || '').trim().toLowerCase();
+        if (!normalizedChoice) {
+          setIsFileSystemDataHydrated(true);
+          return;
+        }
+        if (normalizedChoice === 'l') {
           try {
             const { saveEmergencySnapshot } = await import('./utils/storageBackup');
             await saveEmergencySnapshot({
@@ -2675,12 +2818,15 @@ ${tagsHint ? `\n${tagsHint}` : ''}
             );
           }
           loadedFromDisk = true;
-        } else {
-          const overwrite = window.confirm(t('folder_confirm_overwrite_with_memory'));
-          if (!overwrite) {
+        } else if (normalizedChoice === 'o') {
+          if (!window.confirm(t('folder_confirm_overwrite_with_memory'))) {
             setIsFileSystemDataHydrated(true);
             return;
           }
+        } else {
+          alert(language === 'cn' ? '未识别的选择，已取消' : 'Unknown choice; cancelled');
+          setIsFileSystemDataHydrated(true);
+          return;
         }
       } else if (readResult.ok === false && readResult.reason !== 'not_found') {
         alert(
@@ -2690,6 +2836,12 @@ ${tagsHint ? `\n${tagsHint}` : ''}
         );
         setIsFileSystemDataHydrated(true);
         return;
+      } else {
+        const startFresh = window.confirm(t('folder_choice_no_file'));
+        if (!startFresh) {
+          setIsFileSystemDataHydrated(true);
+          return;
+        }
       }
 
       // 切入文件夹模式前，先把当前内存快照写入 IDB。

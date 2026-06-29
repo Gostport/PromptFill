@@ -100,6 +100,10 @@ export const TRANSLATIONS = {
     browser_not_supported: "浏览器不支持文件系统访问",
     folder_access_denied: "文件夹访问被拒绝",
     load_from_folder: "从文件夹加载",
+    folder_choice_existing:
+      "此文件夹中已有 PromptFill 数据。\n\n输入 L：加载现有文件夹数据\n输入 O：从当前应用数据重新开始并覆盖文件夹数据\n留空或取消：取消",
+    folder_choice_no_file:
+      "未找到 prompt_fill_data.json。是否从当前应用数据开始，并在此文件夹中创建新的存档？",
     folder_confirm_load_existing:
       "该文件夹内已有 prompt_fill_data.json。\n\n点击「确定」将文件中的数据合并到当前应用（同名以当前为准，仅文件中多出的自定义模版会加入，不整表覆盖）。\n点击「取消」不合并文件，并再次确认是否用当前内存覆盖磁盘文件。",
     folder_confirm_overwrite_with_memory:
@@ -255,6 +259,10 @@ export const TRANSLATIONS = {
     browser_not_supported: "Browser doesn't support file system access",
     folder_access_denied: "Folder access denied",
     load_from_folder: "Load from Folder",
+    folder_choice_existing:
+      "Existing PromptFill data found in this folder.\n\nType L to load existing folder data\nType O to start fresh and overwrite folder data\nLeave blank/cancel to cancel",
+    folder_choice_no_file:
+      "No prompt_fill_data.json was found. Start fresh in this folder and create a new data file?",
     folder_confirm_load_existing:
       "This folder already contains prompt_fill_data.json.\n\nOK — merge file data into the app (current wins on conflicts; custom templates only on disk are added; no full replace).\nCancel — skip merging; you will be asked whether to overwrite the file with current data.",
     folder_confirm_overwrite_with_memory:

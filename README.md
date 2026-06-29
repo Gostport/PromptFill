@@ -115,6 +115,24 @@ JSON exports and backups are sanitized before download or sharing. Long URL shar
 
 If local data is missing, use JSON backups, local folder mode files, or the emergency IndexedDB backup panel in Settings where available.
 
+### Storage And Recovery
+
+PromptFill uses IndexedDB as the main browser storage for templates, banks, categories, defaults, and large local data. LocalStorage is kept for smaller app settings such as language, storage mode, and BYOK preferences.
+
+Folder storage mode writes your app data to a folder you choose with the browser File System Access API. The app creates:
+
+- `prompt_fill_data.json` — current folder-mode data.
+- `prompt_fill_data.bak.json` — the previous valid copy, written before the main file is replaced.
+- `prompt_fill_data.json.tmp` — temporary write file, removed after a successful validated save.
+
+When you choose a folder, PromptFill checks for existing `prompt_fill_data.json`. If it exists, you must choose whether to load the folder data, overwrite it with current app data, or cancel. If no file exists, the app asks before creating a fresh folder-mode file.
+
+Folder saves are validated before replacing the main file: the app serializes data, validates the JSON shape, writes and reads back a temp file, validates again, backs up the previous main file, then writes the main file.
+
+JSON import validates shape and shows a summary before applying. Full backups can be merged or used to replace current data. Imported payloads are sanitized so API keys, consent flags, debug keys, and local-only AI settings are dropped.
+
+To recover folder-mode data, first try `prompt_fill_data.json`. If it is missing or damaged, copy `prompt_fill_data.bak.json` to `prompt_fill_data.json` while the app is closed, then reopen PromptFill and load the folder. You can also restore emergency IndexedDB snapshots from Settings where available.
+
 ### Installation & Run
 
 1.  **Clone**
