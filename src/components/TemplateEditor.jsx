@@ -1,5 +1,5 @@
 import React, { useRef, useCallback } from 'react';
-import { Eye, Edit3, Copy, Check, X, ImageIcon, Pencil, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Plus, Trash2, LayoutGrid, Book, Play, Globe, Upload, Info, Film, FolderOpen, FileText, Link } from 'lucide-react';
+import { Eye, Edit3, Copy, Check, X, ImageIcon, Pencil, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Plus, Trash2, LayoutGrid, Book, Play, Globe, Upload, Info, Film, FolderOpen, FileText, Link, Shuffle } from 'lucide-react';
 import { WaypointsIcon } from './icons/WaypointsIcon';
 import { getLocalized, getVideoEmbedInfo } from '../utils/helpers';
 import { TemplatePreview } from './TemplatePreview';
@@ -184,6 +184,7 @@ export const TemplateEditor = React.memo(({
   isExporting,
   handleCopy,
   copied,
+  onRandomizeVariables,
 
   // ===== 模态框 =====
   setIsInsertModalOpen,
@@ -270,7 +271,7 @@ export const TemplateEditor = React.memo(({
 
   const supportsChinese = templateLangs.includes('cn');
     const supportsEnglish = templateLangs.includes('en');
-    const showLanguageToggle = templateLangs.length > 1;
+    const showLanguageToggle = false;
 
     // 辅助组件：渲染参考素材区域
     const renderSourceAssets = () => (
@@ -385,7 +386,7 @@ export const TemplateEditor = React.memo(({
 
               <div className="flex-1 flex items-center justify-center md:justify-start gap-3 overflow-hidden">
                 <h1 className={`text-[20px] font-bold tracking-tight flex items-baseline gap-2 ${isDarkMode ? 'text-[#CDCDCD]' : 'text-[#5D5D5D]'}`}>
-                  {language === 'cn' ? '模版详情' : 'Template Detail'}
+                  Template Detail
                 </h1>
                 
                 {/* 语言切换 - 桌面端显示在标题旁 */}
@@ -439,6 +440,15 @@ export const TemplateEditor = React.memo(({
 
               {/* 右侧操作按钮组 */}
               <div className="flex items-center gap-1.5 md:gap-3 shrink-0">
+                <PremiumButton
+                  onClick={onRandomizeVariables}
+                  icon={Shuffle}
+                  isDarkMode={isDarkMode}
+                  className="!p-0.5 [&_.premium-button-inner]:!min-h-[32px] [&_.premium-button-inner]:!px-2.5 [&_.premium-button-inner]:!text-[12px] [&_.premium-button-inner]:!gap-1.5"
+                  title="Randomize variables"
+                >
+                  <span className="hidden md:inline">Random</span>
+                </PremiumButton>
                 <PremiumButton
                   onClick={handleShareLink}
                   title={language === 'cn' ? '分享' : t('share_link')}

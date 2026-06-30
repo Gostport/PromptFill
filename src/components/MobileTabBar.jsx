@@ -3,10 +3,10 @@ import { Home, List, Edit3, Database, Sun, Moon } from 'lucide-react';
 
 const MobileTabBar = ({ activeTab, onTabChange, t, isDarkMode, themeMode, setThemeMode }) => {
   const tabs = [
-    { id: 'home', icon: Home, label: t('home') || '主页' },
-    { id: 'templates', icon: List, label: t('templates') || '模版列表' },
-    { id: 'editor', icon: Edit3, label: t('editor') || '模版编辑' },
-    { id: 'banks', icon: Database, label: t('banks') || '词库' },
+    { id: 'home', icon: Home, label: t('home') || 'Home' },
+    { id: 'templates', icon: List, label: t('templates') || 'Templates' },
+    { id: 'editor', icon: Edit3, label: t('editor') || 'Editor' },
+    { id: 'banks', icon: Database, label: t('banks') || 'Word Banks' },
   ];
 
   return (
@@ -58,7 +58,7 @@ const MobileTabBar = ({ activeTab, onTabChange, t, isDarkMode, themeMode, setThe
             ) : (themeMode === 'dark' ? <Moon size={20} /> : <Sun size={20} />)}
           </div>
           <span className="text-[10px] font-bold tracking-wide opacity-80">
-            {themeMode === 'system' ? (language === 'cn' ? '自动' : 'Auto') : (isDarkMode ? 'Dark' : 'Light')}
+            {themeMode === 'system' ? 'Auto' : (isDarkMode ? 'Dark' : 'Light')}
           </span>
           {themeMode === 'system' && (
             <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-orange-500 rounded-full"></span>

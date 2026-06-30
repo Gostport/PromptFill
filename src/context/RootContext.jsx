@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useStickyState } from '../hooks';
-import { getSystemLanguage } from '../utils';
 import { TRANSLATIONS } from '../constants/translations';
 
 const RootContext = createContext();
@@ -8,7 +7,7 @@ const RootContext = createContext();
 const APP_VERSION = "1.1.2";
 
 export const RootProvider = ({ children }) => {
-  const [language, setLanguage] = useStickyState(getSystemLanguage(), "app_language_v1");
+  const [language, setLanguageState] = useStickyState("en", "app_language_v1");
   const [themeMode, setThemeMode] = useStickyState("system", "app_theme_mode_v1");
   const [isDarkMode, setIsDarkMode] = useState(false);
 
@@ -17,8 +16,16 @@ export const RootProvider = ({ children }) => {
   const [isTemplatesSidebarVisible, setIsTemplatesSidebarVisible] = useStickyState(true, "panel_templates_sidebar_v1");
   const [isBanksSidebarVisible, setIsBanksSidebarVisible] = useStickyState(true, "panel_banks_sidebar_v1");
 
+  const setLanguage = () => {
+    setLanguageState("en");
+  };
+
+  useEffect(() => {
+    if (language !== "en") setLanguageState("en");
+  }, [language, setLanguageState]);
+
   const t = (key, params = {}) => {
-    let str = TRANSLATIONS[language]?.[key] || key;
+    let str = TRANSLATIONS.en?.[key] || key;
     Object.keys(params).forEach(k => {
         str = str.replace(`{{${k}}}`, params[k]);
     });

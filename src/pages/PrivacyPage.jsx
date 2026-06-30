@@ -1,20 +1,17 @@
 import React from 'react';
-import { useStickyState } from '../hooks';
-import { getSystemLanguage } from '../utils';
-import { ArrowLeft, Globe } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const PrivacyPage = () => {
-  const [language, setLanguage] = useStickyState(getSystemLanguage(), "app_language_v1");
   const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches; // 简单判断，保持一致感
   const navigate = useNavigate();
 
-  const t = (cn, en) => (language === 'cn' ? cn : en);
+  const t = (_cn, en) => en;
 
   return (
     <div className={`min-h-screen transition-colors duration-300 ${isDarkMode ? 'bg-[#1C1917] text-gray-200' : 'bg-white text-gray-800'}`}>
       <div className="max-w-3xl mx-auto px-6 py-12">
-        {/* Header with Back button and Language Switcher */}
+        {/* Header with Back button */}
         <div className="flex items-center justify-between mb-12">
           <button 
             onClick={() => navigate(-1)}
@@ -22,14 +19,6 @@ const PrivacyPage = () => {
           >
             <ArrowLeft size={18} />
             {t('返回', 'Back')}
-          </button>
-          
-          <button 
-            onClick={() => setLanguage(language === 'cn' ? 'en' : 'cn')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition-all ${isDarkMode ? 'bg-white/5 text-orange-400' : 'bg-gray-100 text-blue-600'}`}
-          >
-            <Globe size={18} />
-            {language === 'cn' ? 'English' : '简体中文'}
           </button>
         </div>
 

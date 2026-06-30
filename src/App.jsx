@@ -76,6 +76,10 @@ const App = () => {
   const [templateLanguage, setTemplateLanguage] = useStickyState(language, "app_template_language_v1"); // 模板内容语言
   const [activeTemplateId, setActiveTemplateId] = useStickyState("tpl_photo_grid", "app_active_template_id_v4");
 
+  useEffect(() => {
+    if (templateLanguage !== 'en') setTemplateLanguage('en');
+  }, [templateLanguage, setTemplateLanguage]);
+
   const [isSmartSplitLoading, setIsSmartSplitLoading] = useState(false);
   const [isSmartSplitConfirmOpen, setIsSmartSplitConfirmOpen] = useState(false);
   // 拆分快照：{ templateId, originalContent } — 保存拆分前一刻的模板内容
@@ -2353,7 +2357,7 @@ ${tagsHint ? `\n${tagsHint}` : ''}
     if (e) e.stopPropagation();
     const targetIndex = index !== undefined ? index : currentImageEditIndex;
     openActionConfirm({
-      title: language === 'cn' ? '删除图片' : 'Delete Image',
+      title: 'Delete Image',
       message: language === 'cn' ? '确定要删除这张图片吗？' : 'Delete this image?',
       confirmText: language === 'cn' ? '删除' : 'Delete',
       cancelText: language === 'cn' ? '取消' : 'Cancel',
@@ -2539,6 +2543,49 @@ ${tagsHint ? `\n${tagsHint}` : ''}
           setNoticeMessage(language === 'cn' ? '导出失败，请重试' : 'Export failed, please retry');
       }
   };
+
+  const handleRandomizeVariables = React.useCallback(() => {
+    if (!activeTemplate) return;
+    const content = getLocalized(activeTemplate.content, templateLanguage) || '';
+    const matches = Array.from(content.matchAll(/{{([^}]+)}}/g));
+    if (matches.length === 0) return;
+
+    const counters = {};
+    const nextSelections = { ...(activeTemplate.selections || {}) };
+
+    matches.forEach((match) => {
+      const rawInner = match[1] || '';
+      const colonIndex = rawInner.indexOf(':');
+      const rawKey = colonIndex === -1 ? rawInner : rawInner.slice(0, colonIndex);
+      const inlineValue = colonIndex === -1 ? null : rawInner.slice(colonIndex + 1).trim();
+      const fullKey = rawKey.trim();
+      if (!fullKey) return;
+
+      const baseKey = fullKey.replace(/_(\d+)$/, '');
+      const varIndex = counters[fullKey] || 0;
+      counters[fullKey] = varIndex + 1;
+      const uniqueKey = `${fullKey}-${varIndex}`;
+
+      const bankOptions = banks[baseKey]?.options || banks[fullKey]?.options || [];
+      const localValue = activeTemplate.localOptions?.[baseKey] || activeTemplate.localOptions?.[fullKey];
+      const localOptions = Array.isArray(localValue) ? localValue : (localValue ? [localValue] : []);
+      const candidates = [
+        ...bankOptions,
+        ...localOptions,
+        ...(inlineValue ? [inlineValue] : []),
+      ].filter(Boolean);
+
+      if (candidates.length === 0) return;
+      nextSelections[uniqueKey] = candidates[Math.floor(Math.random() * candidates.length)];
+    });
+
+    setTemplates(prev => prev.map(template =>
+      template.id === activeTemplateId
+        ? { ...template, selections: nextSelections }
+        : template
+    ));
+    setActivePopover(null);
+  }, [activeTemplate, activeTemplateId, banks, setTemplates, templateLanguage]);
 
   const validateImportedTemplate = (template) => (
     template &&
@@ -3989,6 +4036,7 @@ ${tagsHint ? `\n${tagsHint}` : ''}
               splitDurationMs={splitSnapshot?.templateId === activeTemplateId ? (splitSnapshot?.splitDurationMs ?? null) : null}
               onResetClick={() => setIsSplitResetModalOpen(true)}
               updateTemplateProperty={updateTemplateProperty}
+              onRandomizeVariables={handleRandomizeVariables}
               setIsTemplatesDrawerOpen={setIsTemplatesDrawerOpen}
               setIsBanksDrawerOpen={setIsBanksDrawerOpen}
             />

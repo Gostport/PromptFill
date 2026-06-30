@@ -247,14 +247,20 @@ export const useLinkageGroups = (
    * @param {Function} setActivePopover - 关闭弹出层的函数
    */
   const handleAddCustomAndSelect = useCallback((key, index, newValue, setActivePopover) => {
-    if (!newValue || !newValue.trim()) return;
+    const hasValue = typeof newValue === 'string'
+      ? newValue.trim().length > 0
+      : !!newValue && typeof newValue === 'object';
+    if (!hasValue) return;
 
     // 解析变量名，获取 baseKey（词库的 key）
     const parsed = parseVariableName(key);
     const baseKey = parsed.baseKey;
 
     // 1. Add to bank if not exists (使用 baseKey)
-    if (banks[baseKey] && !banks[baseKey].options.includes(newValue)) {
+    const optionExists = banks[baseKey]?.options?.some(option =>
+      JSON.stringify(option) === JSON.stringify(newValue)
+    );
+    if (banks[baseKey] && !optionExists) {
       handleAddOption(baseKey, newValue);
     }
 

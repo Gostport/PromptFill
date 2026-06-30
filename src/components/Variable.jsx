@@ -375,7 +375,7 @@ export const Variable = ({
                     {aiTerms.slice(0, 5).map((term, idx) => (
                       <button
                         key={`ai-${idx}`}
-                        onClick={() => onSelect(term)}
+                        onClick={() => onAddCustom(term)}
                         className={`
                           w-full text-left px-4 py-2.5 rounded-xl text-sm transition-all duration-300 group flex items-center justify-between
                           ${idx < visibleAiTermsCount ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2 pointer-events-none'}
@@ -474,7 +474,7 @@ export const Variable = ({
                     <input
                         autoFocus
                         type="text"
-                        placeholder="新增选项"
+                        placeholder="Add option"
                         value={newOptionPrimary}
                         onChange={(e) => setNewOptionPrimary(e.target.value)}
                         className={`w-full px-4 pt-3 pb-2 text-[14px] font-bold border-none outline-none transition-colors ${isDarkMode ? 'bg-transparent text-gray-200 placeholder:text-gray-600' : 'bg-transparent text-gray-800 placeholder:text-gray-500'}`}
@@ -487,7 +487,7 @@ export const Variable = ({
                     />
                     {/* 语言标签提示 */}
                     <span className={`absolute right-3 top-3 text-[9px] font-black uppercase tracking-tighter opacity-30 pointer-events-none ${isDarkMode ? 'text-white' : 'text-black'}`}>
-                        {language.toUpperCase()}
+                        EN
                     </span>
                 </div>
 
@@ -501,7 +501,7 @@ export const Variable = ({
                         type="text"
                         value={newOptionSecondary}
                         onChange={(e) => setNewOptionSecondary(e.target.value)}
-                        placeholder="Add Option"
+                        placeholder="Optional translation"
                         className={`w-full px-4 pt-2 pb-3 text-[13px] font-medium border-none outline-none transition-colors ${isDarkMode ? 'bg-transparent text-gray-400 placeholder:text-gray-700' : 'bg-transparent text-gray-500 placeholder:text-gray-400'}`}
                         onKeyDown={(e) => {
                             if (e.key === 'Enter') {
@@ -511,7 +511,7 @@ export const Variable = ({
                     />
                     {/* 语言标签提示 */}
                     <span className={`absolute right-3 top-2.5 text-[9px] font-black uppercase tracking-tighter opacity-30 pointer-events-none ${isDarkMode ? 'text-white' : 'text-black'}`}>
-                        {otherLanguage.toUpperCase()}
+                        ALT
                     </span>
                 </div>
             </div>

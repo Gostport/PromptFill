@@ -78,7 +78,7 @@ export const TemplatesSidebar = React.memo(({
       <div className="px-6 pb-4 flex-shrink-0" style={{ paddingTop: 'calc(1.5rem + env(safe-area-inset-top, 0px))' }}>
          <div className="flex items-center justify-between mb-[14px] min-h-10">
               <h1 className={`text-[20px] font-bold tracking-tight flex items-baseline gap-2 ${isDarkMode ? 'text-[#CDCDCD]' : 'text-[#5D5D5D]'}`}>
-                  模版列表
+                  Templates
               </h1>
              
              <div className="flex items-center">
@@ -87,7 +87,7 @@ export const TemplatesSidebar = React.memo(({
                         if (typeof setShowImportTokenModal === 'function') {
                           setShowImportTokenModal(true);
                         } else {
-                          const val = prompt(language === 'cn' ? '请输入分享口令或链接' : 'Please enter share token or link');
+                          const val = prompt('Please enter share token or link');
                           if (val && typeof handleManualTokenImport === 'function') {
                             handleManualTokenImport(val);
                           }
@@ -113,6 +113,24 @@ export const TemplatesSidebar = React.memo(({
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className={`premium-search-input ${isDarkMode ? 'dark' : 'light'}`}
                 />
+            </div>
+            <div className={`grid grid-cols-2 gap-2 rounded-2xl p-1 ${isDarkMode ? 'bg-black/20' : 'bg-white/40'}`}>
+              {[
+                { value: 'newest', label: 'Date' },
+                { value: 'a-z', label: 'Alpha' },
+              ].map(option => (
+                <button
+                  key={option.value}
+                  onClick={() => setSortOrder(option.value)}
+                  className={`px-3 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all ${
+                    sortOrder === option.value || (option.value === 'newest' && sortOrder === 'oldest') || (option.value === 'a-z' && sortOrder === 'z-a')
+                      ? (isDarkMode ? 'bg-orange-500/20 text-orange-400' : 'bg-orange-50 text-orange-600')
+                      : (isDarkMode ? 'text-gray-500 hover:text-gray-300' : 'text-gray-500 hover:text-gray-700')
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
             </div>
          </div>
       </div>

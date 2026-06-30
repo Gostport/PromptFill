@@ -79,21 +79,21 @@ export const AppFooter = ({ appVersion, isDarkMode: isDarkModeProp }) => {
           isVisible={isTagSidebarVisible}
           onClick={() => setIsTagSidebarVisible(v => !v)}
           icon={PanelLeft}
-          tooltip={isTagSidebarVisible ? '隐藏分类栏' : '显示分类栏'}
+          tooltip={isTagSidebarVisible ? 'Hide Tags' : 'Show Tags'}
           isDarkMode={isDarkMode}
         />
         <PanelToggleButton
           isVisible={isTemplatesSidebarVisible}
           onClick={() => setIsTemplatesSidebarVisible(v => !v)}
           icon={PanelCenterIcon}
-          tooltip={isTemplatesSidebarVisible ? '隐藏模版列表' : '显示模版列表'}
+          tooltip={isTemplatesSidebarVisible ? 'Hide Templates' : 'Show Templates'}
           isDarkMode={isDarkMode}
         />
         <PanelToggleButton
           isVisible={isBanksSidebarVisible}
           onClick={() => setIsBanksSidebarVisible(v => !v)}
           icon={PanelRight}
-          tooltip={isBanksSidebarVisible ? '隐藏词库栏' : '显示词库栏'}
+          tooltip={isBanksSidebarVisible ? 'Hide Word Banks' : 'Show Word Banks'}
           isDarkMode={isDarkMode}
         />
       </div>
@@ -114,7 +114,7 @@ export const AppFooter = ({ appVersion, isDarkMode: isDarkModeProp }) => {
         )}
         <span>Made by CornerStudio</span>
         <span className={`w-1 h-1 rounded-full ${isDarkMode ? 'bg-gray-600' : 'bg-gray-400'}`} />
-        <span>公众号：角落工作室</span>
+        <span>CornerStudio</span>
         <span className={`w-1 h-1 rounded-full ${isDarkMode ? 'bg-gray-600' : 'bg-gray-400'}`} />
         <span>Wechat: tanshilongmario</span>
         {/* App Store */}

@@ -78,7 +78,7 @@ export const Sidebar = ({
 
         {/* 导航按钮组 */}
         <div className="flex flex-col items-center gap-4">
-          <Tooltip content="主页" isDarkMode={isDarkMode}>
+          <Tooltip content="Home" isDarkMode={isDarkMode}>
             <Link
               to="/explore"
               className={`p-2 group transition-colors block ${activeTab === 'home' ? (isDarkMode ? 'text-[#FB923C]' : 'text-[#EA580C]') : (isDarkMode ? 'text-[#8E9196]' : 'text-[#6B7280]')} hover:text-[#F97316]`}
@@ -87,7 +87,7 @@ export const Sidebar = ({
             </Link>
           </Tooltip>
 
-          <Tooltip content="详情页" isDarkMode={isDarkMode}>
+          <Tooltip content="Template Detail" isDarkMode={isDarkMode}>
             <Link
               to="/detail"
               className={`p-2 group transition-colors block ${activeTab === 'detail' ? (isDarkMode ? 'text-[#FB923C]' : 'text-[#EA580C]') : (isDarkMode ? 'text-[#8E9196]' : 'text-[#6B7280]')} hover:text-[#F97316]`}
@@ -97,7 +97,7 @@ export const Sidebar = ({
           </Tooltip>
 
           {VIDEO_FEATURE_ENABLED && (
-            <Tooltip content="视频编辑" isDarkMode={isDarkMode}>
+            <Tooltip content="Video Editor" isDarkMode={isDarkMode}>
               <Link
                 to="/video"
                 className={`p-2 group transition-colors block ${location?.pathname?.startsWith('/video') ? (isDarkMode ? 'text-[#FB923C]' : 'text-[#EA580C]') : (isDarkMode ? 'text-[#8E9196]' : 'text-[#6B7280]')} hover:text-[#F97316]`}
@@ -166,10 +166,10 @@ export const Sidebar = ({
 
       {/* 下部分：设置组 */}
       <div className="flex flex-col items-center gap-4 w-full">
-        <Tooltip content={t('language')} isDarkMode={isDarkMode}>
+        <Tooltip content="English UI" isDarkMode={isDarkMode}>
           <button 
-            onClick={() => setLanguage(language === 'cn' ? 'en' : 'cn')}
-            className={`p-2 group transition-colors ${isDarkMode ? 'text-[#8E9196]' : 'text-[#6B7280]'} hover:text-[#F97316]`}
+            onClick={() => setLanguage('en')}
+            className={`p-2 group transition-colors opacity-50 cursor-default ${isDarkMode ? 'text-[#8E9196]' : 'text-[#6B7280]'}`}
           >
             <TranslateIcon size={24} />
           </button>

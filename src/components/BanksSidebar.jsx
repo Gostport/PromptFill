@@ -9,7 +9,7 @@ import { CategoryManagerModal } from './modals/CategoryManagerModal';
 /**
  * 组件：词库分类块
  */
-const CategorySection = ({ catId, categories, banks, onInsert, onDeleteOption, onAddOption, onUpdateOption, onDeleteBank, onUpdateBankCategory, onStartAddBank, t, language, onTouchDragStart, isDarkMode, bankSearchQuery }) => {
+const CategorySection = ({ catId, categories, banks, onInsert, onDeleteOption, onAddOption, onUpdateOption, onDeleteBank, onUpdateBankCategory, onStartAddBank, t, language, onTouchDragStart, isDarkMode, bankSearchQuery, collapseSignal }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const category = categories[catId];
   
@@ -88,6 +88,7 @@ const CategorySection = ({ catId, categories, banks, onInsert, onDeleteOption, o
                         onTouchDragStart={onTouchDragStart}
                         isDarkMode={isDarkMode}
                         bankSearchQuery={bankSearchQuery}
+                        collapseSignal={collapseSignal}
                     />
                 ))}
                 
@@ -111,7 +112,7 @@ const CategorySection = ({ catId, categories, banks, onInsert, onDeleteOption, o
 /**
  * 组件：可折叠的词库组
  */
-const BankGroup = ({ bankKey, bank, onInsert, onDeleteOption, onAddOption, onUpdateOption, onDeleteBank, onUpdateBankCategory, categories, t, language, onTouchDragStart, isDarkMode, bankSearchQuery }) => {
+const BankGroup = ({ bankKey, bank, onInsert, onDeleteOption, onAddOption, onUpdateOption, onDeleteBank, onUpdateBankCategory, categories, t, language, onTouchDragStart, isDarkMode, bankSearchQuery, collapseSignal }) => {
     const [isCollapsed, setIsCollapsed] = useState(true);
     const [isEditingCategory, setIsEditingCategory] = useState(false);
     const [editingOptionIdx, setEditingOptionIdx] = useState(null);
@@ -131,6 +132,10 @@ const BankGroup = ({ bankKey, bank, onInsert, onDeleteOption, onAddOption, onUpd
             setIsCollapsed(false);
         }
     }, [bankSearchQuery]);
+
+    React.useEffect(() => {
+        if (collapseSignal > 0) setIsCollapsed(true);
+    }, [collapseSignal]);
 
     const categoryId = bank.category || 'other';
     const colorKey = categories[categoryId]?.color || 'slate';
@@ -345,7 +350,7 @@ const BankGroup = ({ bankKey, bank, onInsert, onDeleteOption, onAddOption, onUpd
                                                             type="text"
                                                             value={editOptionPrimary}
                                                             onChange={(e) => setEditOptionPrimary(e.target.value)}
-                                                            placeholder={language === 'cn' ? '中文内容' : 'English Content'}
+                                                            placeholder="Option text"
                                                             className={`w-full bg-transparent border-none outline-none py-1.5 text-[14px] font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}
                                                             onKeyDown={(e) => {
                                                                 if (e.key === 'Enter') {
@@ -365,7 +370,7 @@ const BankGroup = ({ bankKey, bank, onInsert, onDeleteOption, onAddOption, onUpd
                                                             type="text"
                                                             value={editOptionSecondary}
                                                             onChange={(e) => setEditOptionSecondary(e.target.value)}
-                                                            placeholder={language === 'cn' ? '英文内容' : '中文内容'}
+                                                            placeholder="Optional translation"
                                                             className={`w-full bg-transparent border-none outline-none py-1.5 text-[13px] font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}
                                                             onKeyDown={(e) => {
                                                                 if (e.key === 'Enter') {
@@ -432,7 +437,7 @@ const BankGroup = ({ bankKey, bank, onInsert, onDeleteOption, onAddOption, onUpd
                                 <div className="relative">
                                     <input
                                         type="text"
-                                        placeholder={language === 'cn' ? '新增选项' : 'Add Option'}
+                                        placeholder="Add option"
                                         value={newOptionPrimary}
                                         onChange={(e) => setNewOptionPrimary(e.target.value)}
                                         className={`w-full px-4 pt-3 pb-2 text-[14px] font-bold border-none outline-none transition-colors ${isDarkMode ? 'bg-transparent text-gray-200 placeholder:text-gray-600' : 'bg-transparent text-gray-800 placeholder:text-gray-500'}`}
@@ -445,7 +450,7 @@ const BankGroup = ({ bankKey, bank, onInsert, onDeleteOption, onAddOption, onUpd
                                     />
                                     {/* 语言标签提示 */}
                                     <span className={`absolute right-3 top-3 text-[9px] font-black uppercase tracking-tighter opacity-30 pointer-events-none ${isDarkMode ? 'text-white' : 'text-black'}`}>
-                                        {language.toUpperCase()}
+                                        EN
                                     </span>
                                 </div>
 
@@ -459,7 +464,7 @@ const BankGroup = ({ bankKey, bank, onInsert, onDeleteOption, onAddOption, onUpd
                                         type="text"
                                         value={newOptionSecondary}
                                         onChange={(e) => setNewOptionSecondary(e.target.value)}
-                                        placeholder={language === 'cn' ? 'Add Option' : '新增选项'}
+                                        placeholder="Optional translation"
                                         className={`w-full px-4 pt-2 pb-3 text-[13px] font-medium border-none outline-none transition-colors ${isDarkMode ? 'bg-transparent text-gray-400 placeholder:text-gray-700' : 'bg-transparent text-gray-500 placeholder:text-gray-400'}`}
                                         onKeyDown={(e) => {
                                             if (e.key === 'Enter') {
@@ -469,7 +474,7 @@ const BankGroup = ({ bankKey, bank, onInsert, onDeleteOption, onAddOption, onUpd
                                     />
                                     {/* 语言标签提示 */}
                                     <span className={`absolute right-3 top-2.5 text-[9px] font-black uppercase tracking-tighter opacity-30 pointer-events-none ${isDarkMode ? 'text-white' : 'text-black'}`}>
-                                        {otherLanguage.toUpperCase()}
+                                        ALT
                                     </span>
                                 </div>
                             </div>
@@ -498,7 +503,14 @@ const BankGroup = ({ bankKey, bank, onInsert, onDeleteOption, onAddOption, onUpd
  * 核心组件：变量插入选择器
  */
 export const InsertVariableModal = ({ isOpen, onClose, categories, banks, onSelect, t, language, isDarkMode }) => {
+  const [insertSearchQuery, setInsertSearchQuery] = React.useState("");
+  React.useEffect(() => {
+    if (isOpen) setInsertSearchQuery("");
+  }, [isOpen]);
+
   if (!isOpen) return null;
+
+  const query = insertSearchQuery.trim().toLowerCase();
 
   return (
     <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 animate-fade-in">
@@ -510,9 +522,28 @@ export const InsertVariableModal = ({ isOpen, onClose, categories, banks, onSele
           <button onClick={onClose} className={`p-1 rounded transition-colors ${isDarkMode ? 'hover:bg-white/10 text-gray-500' : 'hover:bg-gray-200 text-gray-500'}`}><X size={18}/></button>
         </div>
         
+        <div className={`px-4 py-3 border-b ${isDarkMode ? 'border-white/5' : 'border-gray-100'}`}>
+          <div className={`premium-search-container group ${isDarkMode ? 'dark' : 'light'}`}>
+            <Search className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors pointer-events-none z-10 ${isDarkMode ? 'text-gray-600 group-focus-within:text-orange-500' : 'text-gray-400 group-focus-within:text-orange-500'}`} size={16} />
+            <input
+              type="text"
+              value={insertSearchQuery}
+              onChange={(e) => setInsertSearchQuery(e.target.value)}
+              placeholder="Search insert list..."
+              className={`premium-search-input ${isDarkMode ? 'dark' : 'light'}`}
+            />
+          </div>
+        </div>
+
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
            {Object.keys(categories).map(catId => {
-               const catBanks = Object.entries(banks).filter(([_, bank]) => (bank.category || 'other') === catId);
+               const catBanks = Object.entries(banks).filter(([key, bank]) => {
+                 if ((bank.category || 'other') !== catId) return false;
+                 if (!query) return true;
+                 const label = getLocalized(bank.label, language).toLowerCase();
+                 const options = (bank.options || []).map(opt => getLocalized(opt, language).toLowerCase()).join(' ');
+                 return key.toLowerCase().includes(query) || label.includes(query) || options.includes(query);
+               });
                if (catBanks.length === 0) return null;
                
                const category = categories[catId];
@@ -661,6 +692,7 @@ export const BanksSidebar = React.memo(({
 }) => {
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
   const [bankSearchQuery, setBankSearchQuery] = useState("");
+  const [collapseSignal, setCollapseSignal] = useState(0);
 
   return (
     <>
@@ -708,12 +740,18 @@ export const BanksSidebar = React.memo(({
           </PremiumButton>
         </div>
         <div className="flex flex-col gap-4">
+            <button
+              onClick={() => setCollapseSignal(value => value + 1)}
+              className={`self-start px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-widest border transition-all ${isDarkMode ? 'border-white/10 text-gray-400 hover:text-orange-400 hover:bg-white/5' : 'border-gray-200 text-gray-500 hover:text-orange-600 hover:bg-white/50'}`}
+            >
+              Collapse All
+            </button>
             {/* 搜索框 */}
             <div className={`premium-search-container group ${isDarkMode ? 'dark' : 'light'}`}>
                 <Search className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors pointer-events-none z-10 ${isDarkMode ? 'text-gray-600 group-focus-within:text-orange-500' : 'text-gray-400 group-focus-within:text-orange-500'}`} size={16} />
                 <input 
                   type="text" 
-                  placeholder={t('search_banks') || "搜索词条..."} 
+                  placeholder={t('search_banks') || "Search word banks..."}
                   value={bankSearchQuery} 
                   onChange={(e) => setBankSearchQuery(e.target.value)} 
                   className={`premium-search-input ${isDarkMode ? 'dark' : 'light'}`} 
@@ -744,6 +782,7 @@ export const BanksSidebar = React.memo(({
                         onTouchDragStart={onTouchDragStart}
                         isDarkMode={isDarkMode}
                         bankSearchQuery={bankSearchQuery}
+                        collapseSignal={collapseSignal}
                     />
                 ))}
              </div>
@@ -766,6 +805,7 @@ export const BanksSidebar = React.memo(({
                         onTouchDragStart={onTouchDragStart}
                         isDarkMode={isDarkMode}
                         bankSearchQuery={bankSearchQuery}
+                        collapseSignal={collapseSignal}
                     />
                 ))}
              </div>
@@ -790,6 +830,7 @@ export const BanksSidebar = React.memo(({
                       onTouchDragStart={onTouchDragStart}
                       isDarkMode={isDarkMode}
                       bankSearchQuery={bankSearchQuery}
+                      collapseSignal={collapseSignal}
                   />
               ))}
           </div>
