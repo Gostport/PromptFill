@@ -1,0 +1,16 @@
+建筑 → Architecture
+摄影 → Photography
+产品 → Product
+图表 → Chart
+卡通 → Cartoon
+宠物 → Pet
+游戏 → Game
+节日 → Festival
+动作 → Action
+影视 → Film / Television
+纪实 → Documentary
+幻想 → Fantasy
+动画 → Animation
+武侠 → Martial Arts (Wuxia)
+现代 → Modern
+修仙 → Immortal Cultivation / Xianxia
